@@ -17,7 +17,7 @@ import (
 
 const CurrentProtocolVersion = "1"
 
-var ErrNotPaired = errors.New("Starcat CLI is not paired; run `starcat pair --stdin`")
+var ErrNotPaired = errors.New("Starcat CLI is not paired; run `starcat pair`")
 
 // Profile 是 CLI 与一台 Starcat App 建立连接所需的非敏感资料。
 type Profile struct {

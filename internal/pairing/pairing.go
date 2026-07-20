@@ -1,5 +1,7 @@
 // Package pairing 实现一次性 URI 配对。
 // URI 中的 secret 短时有效且只能兑换一次，长期设备 token 不进入命令行输出。
+// Starcat 设置页可生成包含该短期 URI 的完整命令；即使命令进入 shell history，
+// secret 也会在五分钟后过期或首次兑换后立即失效，最终签发仍需 App 内人工确认。
 package pairing
 
 import (

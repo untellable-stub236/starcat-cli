@@ -49,7 +49,7 @@ type Release struct {
 	Assets  []Asset `json:"assets"`
 }
 
-// Result is written as JSON by `starcat update`.
+// Result carries the fields needed to render the terminal update summary.
 type Result struct {
 	Updated        bool   `json:"updated"`
 	CurrentVersion string `json:"current_version"`

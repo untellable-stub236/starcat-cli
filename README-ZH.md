@@ -31,7 +31,7 @@ Tap 仓库名为 `starcat-app/homebrew-starcat-cli`，安装后的命令仍是 `
 curl -fsSL https://github.com/starcat-app/starcat-cli/releases/latest/download/install.sh | sh
 ```
 
-默认安装到 `~/.local/bin/starcat`，可通过 `STARCAT_INSTALL_DIR` 覆盖。
+默认安装到 `~/.local/bin/starcat`，可通过 `STARCAT_INSTALL_DIR` 覆盖。安装脚本会显示平台检测、下载、SHA-256 校验和安装进度；完成后给出 PATH、配对步骤和常用命令。
 
 ### Windows PowerShell
 
@@ -39,18 +39,18 @@ curl -fsSL https://github.com/starcat-app/starcat-cli/releases/latest/download/i
 irm https://github.com/starcat-app/starcat-cli/releases/latest/download/install.ps1 | iex
 ```
 
-默认安装到 `$HOME\.local\bin\starcat.exe`。安装脚本会从 GitHub Release 下载当前平台资产，并先使用 `checksums.txt` 校验 SHA-256。
+默认安装到 `$HOME\.local\bin\starcat.exe`。PowerShell 安装脚本同样会显示版本解析、平台检测、下载、SHA-256 校验和安装进度，并在完成后给出 PATH、配对步骤和常用命令。
 
 ## 配对
 
-在 Starcat 的「设置 → MCP 服务」中启动服务并复制一次性配对说明，然后运行：
+在 Starcat 的「设置 → MCP 服务」中启动服务，点击「复制配对命令」，把完整命令粘贴到目标设备的终端并按回车，然后回到 Starcat 确认设备：
 
 ```bash
-starcat pair --stdin
-starcat doctor --json
+starcat pair "starcat-pair://connect?..."
+starcat doctor
 ```
 
-一次性 URI 通过 stdin 输入，不进入 shell history 或进程参数。长期设备凭据保存在 macOS Keychain、Windows Credential Manager 或 Linux Secret Service。
+需要手工输入时，可运行 `starcat pair`，粘贴 URI 后直接按回车。配对命令五分钟内有效、只能兑换一次，并且仍需在 Starcat 中人工确认。长期设备凭据保存在 macOS Keychain、Windows Credential Manager 或 Linux Secret Service。
 
 ## 更新
 
@@ -76,13 +76,16 @@ export STARCAT_NO_UPDATE_CHECK=1
 ## 常用命令
 
 ```bash
-starcat capabilities --json
+starcat help
+starcat capabilities
 starcat repo search "local RAG" --scope starred --limit 20
 starcat repo context owner/repo
 starcat repo readme owner/repo
 starcat repo summary owner/repo
 starcat tags list
 ```
+
+`help`、`version`、`pair`、`unpair`、`doctor` 和 `update` 默认使用适合终端阅读的文本；`capabilities`、`repo`、`tags` 等数据命令直接输出 JSON。只有自动化确实需要机器可读诊断时才使用 `starcat doctor --json`。
 
 写操作默认 dry-run，必须显式传 `--apply` 才会持久化。
 

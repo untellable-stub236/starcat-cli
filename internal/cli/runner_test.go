@@ -47,17 +47,42 @@ func TestRepoTagReplaceExplainsDestructiveWriteSetting(t *testing.T) {
 	}
 }
 
-func TestPairOnlyAcceptsURIFromStdin(t *testing.T) {
-	runner := &Runner{Stdin: strings.NewReader("invalid"), Stdout: io.Discard, Stderr: io.Discard}
-	if err := runner.Run(context.Background(), []string{"pair", "starcat-pair://secret"}); err == nil || err.Error() != "Usage: starcat pair --stdin" {
-		t.Fatalf("pair argument error = %v", err)
+func TestPairRejectsRemovedStdinFlag(t *testing.T) {
+	runner := &Runner{Stdin: strings.NewReader("invalid\n"), Stdout: io.Discard, Stderr: io.Discard}
+	if err := runner.Run(context.Background(), []string{"pair", "--stdin"}); err == nil || !strings.Contains(err.Error(), "unknown flag") {
+		t.Fatalf("pair --stdin error = %v, want unknown flag", err)
 	}
-	if err := runner.Run(context.Background(), []string{"pair", "--stdin"}); err == nil || !strings.Contains(err.Error(), "invalid pairing URI") {
-		t.Fatalf("pair stdin error = %v", err)
+	if err := runner.Run(context.Background(), []string{"pair", "starcat-pair://invalid"}); err == nil || !strings.Contains(err.Error(), "invalid pairing URI") {
+		t.Fatalf("pair URI error = %v", err)
 	}
 }
 
-func TestUpdateWritesMachineReadableResult(t *testing.T) {
+func TestPairingInputStopsAtEnter(t *testing.T) {
+	line, err := readLineContext(context.Background(), strings.NewReader("starcat-pair://first\nsecond"))
+	if err != nil {
+		t.Fatalf("readLineContext() error = %v", err)
+	}
+	if line != "starcat-pair://first" {
+		t.Fatalf("line = %q, want first line only", line)
+	}
+}
+
+func TestHelpUsesTerminalTextInsteadOfJSONEnvelope(t *testing.T) {
+	var stdout bytes.Buffer
+	runner := &Runner{Stdout: &stdout}
+
+	if err := runner.Run(context.Background(), []string{"--help"}); err != nil {
+		t.Fatalf("Run(--help) error = %v", err)
+	}
+	if strings.HasPrefix(strings.TrimSpace(stdout.String()), "{") {
+		t.Fatalf("help should not be wrapped in JSON: %q", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "Usage:") || !strings.Contains(stdout.String(), "starcat help <command>") {
+		t.Fatalf("help output = %q", stdout.String())
+	}
+}
+
+func TestUpdateWritesTerminalResult(t *testing.T) {
 	var stdout bytes.Buffer
 	runner := &Runner{
 		Stdout: &stdout,
@@ -68,8 +93,42 @@ func TestUpdateWritesMachineReadableResult(t *testing.T) {
 	if err := runner.Run(context.Background(), []string{"update"}); err != nil {
 		t.Fatalf("Run(update) error = %v", err)
 	}
-	if !strings.Contains(stdout.String(), `"latest_version": "v1.1.0"`) {
-		t.Fatalf("update stdout = %q", stdout.String())
+	if !strings.Contains(stdout.String(), "Updated Starcat CLI from v1.0.0 to v1.1.0") {
+		t.Fatalf("update stdout = %q, want terminal result", stdout.String())
+	}
+}
+
+func TestDoctorDefaultsToTerminalTextAndJSONIsExplicit(t *testing.T) {
+	var stdout bytes.Buffer
+	runner, _, closeServer := newWriteRunner(t, strings.NewReader(""), true)
+	defer closeServer()
+	runner.Stdout = &stdout
+
+	if err := runner.Run(context.Background(), []string{"doctor"}); err != nil {
+		t.Fatalf("Run(doctor) error = %v", err)
+	}
+	if !strings.Contains(stdout.String(), "Starcat Doctor") || strings.HasPrefix(strings.TrimSpace(stdout.String()), "{") {
+		t.Fatalf("doctor stdout = %q, want terminal text", stdout.String())
+	}
+
+	stdout.Reset()
+	if err := runner.Run(context.Background(), []string{"doctor", "--json"}); err != nil {
+		t.Fatalf("Run(doctor --json) error = %v", err)
+	}
+	if !strings.Contains(stdout.String(), `"healthy": true`) {
+		t.Fatalf("doctor --json stdout = %q", stdout.String())
+	}
+
+	if err := runner.Run(context.Background(), []string{"doctor", "--verbose"}); err == nil {
+		t.Fatal("doctor accepted an unknown flag")
+	}
+}
+
+func TestUnknownFlagsAreRejected(t *testing.T) {
+	runner := &Runner{Stdout: io.Discard}
+	err := runner.Run(context.Background(), []string{"repo", "search", "swift", "--semnatic"})
+	if err == nil || !strings.Contains(err.Error(), `unknown flag "--semnatic"`) {
+		t.Fatalf("Run() error = %v, want unknown flag", err)
 	}
 }
 
@@ -157,6 +216,13 @@ func newWriteRunner(t *testing.T, stdin io.Reader, localWrites bool) (*Runner, *
 			writeMCPResult(writer, message["id"], map[string]any{"protocolVersion": "2025-03-26"})
 		case "notifications/initialized":
 			writer.WriteHeader(http.StatusAccepted)
+		case "tools/list":
+			writeMCPResult(writer, message["id"], map[string]any{
+				"tools": []any{
+					map[string]any{"name": "starcat.get_capabilities"},
+					map[string]any{"name": "starcat.search_repos"},
+				},
+			})
 		case "tools/call":
 			params, _ := message["params"].(map[string]any)
 			tool, _ := params["name"].(string)

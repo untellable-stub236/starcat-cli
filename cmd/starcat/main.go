@@ -28,7 +28,7 @@ func main() {
 	if errors.Is(err, context.Canceled) {
 		return
 	}
-	// stdout 是 JSON/MCP 协议通道，所有错误只能写 stderr。
+	// stdout 可能是终端文本、业务 JSON 或 MCP 协议；错误统一写 stderr，避免污染成功输出。
 	fmt.Fprintln(os.Stderr, "starcat:", err)
 	os.Exit(1)
 }

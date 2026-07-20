@@ -49,18 +49,18 @@ irm https://github.com/starcat-app/starcat-cli/releases/latest/download/install.
 
 The default destination is `$HOME\.local\bin\starcat.exe`.
 
-Every installer downloads assets from GitHub Releases and verifies the archive against `checksums.txt` before installation.
+Every installer reports platform detection, download, checksum verification, and installation progress. Assets come from GitHub Releases and are verified against `checksums.txt` before installation. The completion message includes PATH guidance, pairing steps, and common commands.
 
 ## Pair with Starcat
 
-In Starcat, open **Settings > MCP Service**, start the service, and copy a one-time pairing instruction. The URI is read from stdin so it does not appear in shell history or process arguments:
+In Starcat, open **Settings > MCP Service**, start the service, and click **Copy Pairing Command**. Paste the complete command into the target device's terminal and press Enter, then approve the device in Starcat:
 
 ```bash
-starcat pair --stdin
-starcat doctor --json
+starcat pair "starcat-pair://connect?..."
+starcat doctor
 ```
 
-Paste the one-time URI into stdin and submit with `Ctrl+D` on macOS/Linux or `Ctrl+Z`, then Enter, on Windows. Pairing URIs expire after five minutes and can only be redeemed once. Long-lived device credentials are stored in macOS Keychain, Windows Credential Manager, or Linux Secret Service.
+For manual entry, run `starcat pair`, paste the URI, and press Enter. Pairing commands expire after five minutes, can only be redeemed once, and still require approval inside Starcat. Long-lived device credentials are stored in macOS Keychain, Windows Credential Manager, or Linux Secret Service.
 
 ## Configure an MCP client
 
@@ -78,13 +78,16 @@ After pairing, configure the AI agent with a user-level MCP server:
 ## Commands
 
 ```bash
-starcat capabilities --json
+starcat help
+starcat capabilities
 starcat repo search "local RAG" --scope starred --limit 20
 starcat repo context owner/repo
 starcat repo readme owner/repo
 starcat repo summary owner/repo
 starcat tags list
 ```
+
+`help`, `version`, `pair`, `unpair`, `doctor`, and `update` use terminal-friendly output. Data commands such as `capabilities`, `repo`, and `tags` write JSON. `starcat doctor --json` is available only when automation needs a machine-readable diagnostic result.
 
 Write operations are dry-run by default and require `--apply` to persist changes:
 

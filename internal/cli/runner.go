@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -34,7 +35,7 @@ type Runner struct {
 	Stderr      io.Writer
 	RunUpdate   func(context.Context, string) (updater.Result, error)
 
-	// stdinInteractive 只控制人类可见提示；stdout 仍严格保留给 JSON/MCP 输出。
+	// stdinInteractive 只控制人类可见提示；`starcat mcp` 的 stdout 仍严格保留给协议输出。
 	stdinInteractive bool
 }
 
@@ -56,16 +57,22 @@ func NewRunner(stdin io.Reader, stdout, stderr io.Writer) (*Runner, error) {
 
 func (r *Runner) Run(ctx context.Context, args []string) error {
 	if len(args) == 0 {
-		return r.writeJSON(map[string]any{"help": usage})
+		return r.writeText(usage)
 	}
 	switch args[0] {
 	case "help", "--help", "-h":
-		return r.writeJSON(map[string]any{"help": usage})
+		return r.runHelp(args[1:])
 	case "version", "--version":
-		return r.writeJSON(map[string]any{"version": mcp.Version})
+		if len(args) != 1 {
+			return errors.New("Usage: starcat version")
+		}
+		return r.writeText("Starcat CLI " + mcp.Version)
 	case "pair":
 		return r.runPair(ctx, args[1:])
 	case "unpair":
+		if len(args) != 1 {
+			return errors.New("Usage: starcat unpair")
+		}
 		return r.unpair()
 	case "update":
 		if len(args) != 1 {
@@ -78,12 +85,18 @@ func (r *Runner) Run(ctx context.Context, args []string) error {
 		if err != nil {
 			return err
 		}
-		return r.writeJSON(result)
+		return r.writeUpdateResult(result)
 	case "doctor":
-		return r.doctor(ctx)
+		return r.runDoctor(ctx, args[1:])
 	case "capabilities":
+		if len(args) != 1 {
+			return errors.New("Usage: starcat capabilities")
+		}
 		return r.call(ctx, "starcat.get_capabilities", map[string]any{})
 	case "mcp":
+		if len(args) != 1 {
+			return errors.New("Usage: starcat mcp")
+		}
 		transport, err := r.loadTransport()
 		if err != nil {
 			return err
@@ -103,30 +116,53 @@ func (r *Runner) Run(ctx context.Context, args []string) error {
 	}
 }
 
+func (r *Runner) runHelp(args []string) error {
+	if len(args) == 0 {
+		return r.writeText(usage)
+	}
+	if len(args) != 1 {
+		return errors.New("Usage: starcat help [command]")
+	}
+	help, ok := commandHelp[args[0]]
+	if !ok {
+		return fmt.Errorf("unknown command %q; run `starcat help` for usage", args[0])
+	}
+	return r.writeText(help)
+}
+
 func (r *Runner) runPair(ctx context.Context, args []string) error {
-	if len(args) != 1 || args[0] != "--stdin" {
-		return errors.New("Usage: starcat pair --stdin")
-	}
-	if r.stdinInteractive && r.Stderr != nil {
-		fmt.Fprintln(r.Stderr, pairingInputPrompt())
-	}
-	rawURI, err := readAllContext(ctx, io.LimitReader(r.Stdin, maxPairingURIBytes+1))
-	if err != nil {
-		return fmt.Errorf("read pairing URI from stdin: %w", err)
+	var rawURI string
+	switch len(args) {
+	case 0:
+		if r.stdinInteractive && r.Stderr != nil {
+			fmt.Fprintln(r.Stderr, pairingInputPrompt())
+		}
+		line, err := readLineContext(ctx, io.LimitReader(r.Stdin, maxPairingURIBytes+1))
+		if err != nil {
+			return fmt.Errorf("read pairing URI from stdin: %w", err)
+		}
+		rawURI = line
+	case 1:
+		if strings.HasPrefix(args[0], "--") {
+			return fmt.Errorf("unknown flag %q; run `starcat help pair` for usage", args[0])
+		}
+		rawURI = args[0]
+	default:
+		return errors.New("Usage: starcat pair [one-time-pairing-URI]")
 	}
 	if len(rawURI) > maxPairingURIBytes {
 		return fmt.Errorf("pairing URI exceeds the %d-byte limit", maxPairingURIBytes)
 	}
-	profile, err := (pairing.Service{Profiles: r.Profiles, Credentials: r.Credentials}).Pair(ctx, string(rawURI))
+	profile, err := (pairing.Service{Profiles: r.Profiles, Credentials: r.Credentials}).Pair(ctx, rawURI)
 	if err != nil {
 		return err
 	}
-	return r.writeJSON(map[string]any{
-		"paired":           true,
-		"device_id":        profile.DeviceID,
-		"endpoint":         profile.Endpoint,
-		"protocol_version": profile.ProtocolVersion,
-	})
+	return r.writeText(fmt.Sprintf(
+		"✓ Paired with Starcat successfully.\n\nEndpoint: %s\nDevice ID: %s\nProtocol version: %s\n\nNext step:\n  starcat doctor",
+		profile.Endpoint,
+		profile.DeviceID,
+		profile.ProtocolVersion,
+	))
 }
 
 func (r *Runner) runRepo(ctx context.Context, args []string) error {
@@ -135,7 +171,9 @@ func (r *Runner) runRepo(ctx context.Context, args []string) error {
 	}
 	switch args[0] {
 	case "search":
-		positionals, flags, err := parseFlags(args[1:], map[string]bool{"scope": true, "limit": true})
+		positionals, flags, err := parseFlags(args[1:], map[string]bool{
+			"scope": true, "limit": true, "semantic": false,
+		})
 		if err != nil {
 			return err
 		}
@@ -156,7 +194,12 @@ func (r *Runner) runRepo(ctx context.Context, args []string) error {
 		}
 		return r.call(ctx, tool, map[string]any{"query": positionals[0], "scope": scope, "limit": limit})
 	case "context", "readme", "summary":
-		positionals, flags, err := parseFlags(args[1:], nil)
+		allowedFlags := map[string]bool{}
+		if args[0] == "summary" {
+			allowedFlags["generate"] = false
+			allowedFlags["allow-external-context"] = false
+		}
+		positionals, flags, err := parseFlags(args[1:], allowedFlags)
 		if err != nil {
 			return err
 		}
@@ -172,6 +215,9 @@ func (r *Runner) runRepo(ctx context.Context, args []string) error {
 			"readme":  "starcat.get_readme",
 			"summary": "starcat.get_repo_summary",
 		}[args[0]]
+		if args[0] == "summary" && hasFlag(flags, "allow-external-context") && !hasFlag(flags, "generate") {
+			return errors.New("--allow-external-context requires --generate")
+		}
 		if args[0] == "summary" && hasFlag(flags, "generate") {
 			tool = "starcat.generate_repo_summary"
 			selector["allow_external_context"] = hasFlag(flags, "allow-external-context")
@@ -189,7 +235,7 @@ func (r *Runner) runRepo(ctx context.Context, args []string) error {
 }
 
 func (r *Runner) runRepoNote(ctx context.Context, args []string) error {
-	positionals, flags, err := parseFlags(args, nil)
+	positionals, flags, err := parseFlags(args, map[string]bool{"stdin": false, "apply": false})
 	if err != nil {
 		return err
 	}
@@ -223,7 +269,7 @@ func (r *Runner) runRepoNote(ctx context.Context, args []string) error {
 }
 
 func (r *Runner) runRepoStatus(ctx context.Context, args []string) error {
-	positionals, flags, err := parseFlags(args, nil)
+	positionals, flags, err := parseFlags(args, map[string]bool{"apply": false})
 	if err != nil {
 		return err
 	}
@@ -244,7 +290,7 @@ func (r *Runner) runRepoStatus(ctx context.Context, args []string) error {
 }
 
 func (r *Runner) runRepoTags(ctx context.Context, args []string) error {
-	positionals, flags, err := parseFlags(args, nil)
+	positionals, flags, err := parseFlags(args, map[string]bool{"apply": false})
 	if err != nil {
 		return err
 	}
@@ -277,7 +323,9 @@ func (r *Runner) runRepoTags(ctx context.Context, args []string) error {
 }
 
 func (r *Runner) runTag(ctx context.Context, args []string) error {
-	positionals, flags, err := parseFlags(args, map[string]bool{"color": true, "icon": true})
+	positionals, flags, err := parseFlags(args, map[string]bool{
+		"color": true, "icon": true, "apply": false,
+	})
 	if err != nil {
 		return err
 	}
@@ -294,7 +342,17 @@ func (r *Runner) runTag(ctx context.Context, args []string) error {
 	return r.callWrite(ctx, "starcat.create_tag", "local_writes", arguments)
 }
 
-func (r *Runner) doctor(ctx context.Context) error {
+func (r *Runner) runDoctor(ctx context.Context, args []string) error {
+	jsonOutput := false
+	if len(args) == 1 && args[0] == "--json" {
+		jsonOutput = true
+	} else if len(args) != 0 {
+		return errors.New("Usage: starcat doctor [--json]")
+	}
+	return r.doctor(ctx, jsonOutput)
+}
+
+func (r *Runner) doctor(ctx context.Context, jsonOutput bool) error {
 	profile, err := r.Profiles.Load()
 	if err != nil {
 		return err
@@ -311,7 +369,7 @@ func (r *Runner) doctor(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return r.writeJSON(map[string]any{
+	result := map[string]any{
 		"healthy":          true,
 		"cli_version":      mcp.Version,
 		"app_version":      profile.AppVersion,
@@ -319,7 +377,24 @@ func (r *Runner) doctor(ctx context.Context) error {
 		"endpoint":         profile.Endpoint,
 		"tool_count":       len(tools),
 		"capabilities":     capabilities,
-	})
+	}
+	if jsonOutput {
+		return r.writeJSON(result)
+	}
+
+	tlsStatus := "✓ Local loopback connection"
+	if strings.HasPrefix(profile.Endpoint, "https://") {
+		tlsStatus = "✓ TLS certificate fingerprint verified"
+	}
+	return r.writeText(fmt.Sprintf(
+		"Starcat Doctor\n\n✓ Pairing profile found\n%s\n✓ MCP connection healthy\n✓ Available tools: %d\n✓ Capabilities loaded\n\nCLI version: %s\nApp version: %s\nProtocol version: %s\nEndpoint: %s",
+		tlsStatus,
+		len(tools),
+		mcp.Version,
+		profile.AppVersion,
+		profile.ProtocolVersion,
+		profile.Endpoint,
+	))
 }
 
 func (r *Runner) unpair() error {
@@ -335,7 +410,7 @@ func (r *Runner) unpair() error {
 	if err := r.Profiles.Delete(); err != nil {
 		return err
 	}
-	return r.writeJSON(map[string]any{"paired": false})
+	return r.writeText("✓ Starcat CLI is no longer paired.")
 }
 
 func (r *Runner) call(ctx context.Context, tool string, arguments map[string]any) error {
@@ -426,6 +501,23 @@ func (r *Runner) writeJSON(value any) error {
 	return encoder.Encode(value)
 }
 
+func (r *Runner) writeText(value string) error {
+	_, err := fmt.Fprintln(r.Stdout, value)
+	return err
+}
+
+func (r *Runner) writeUpdateResult(result updater.Result) error {
+	if result.Updated {
+		return r.writeText(fmt.Sprintf(
+			"✓ Updated Starcat CLI from %s to %s.\nExecutable: %s",
+			result.CurrentVersion,
+			result.LatestVersion,
+			result.Executable,
+		))
+	}
+	return r.writeText(fmt.Sprintf("✓ Starcat CLI is up to date (%s).", result.CurrentVersion))
+}
+
 // readAllContext 让被 signal.NotifyContext 取消的 CLI 能立即退出。
 // 终端读取本身没有跨平台的 context API，因此放到 goroutine 中；生产入口取消后会立刻结束进程，
 // 缓冲 channel 则保证读取稍后结束时不会再次阻塞该 goroutine。
@@ -448,6 +540,30 @@ func readAllContext(ctx context.Context, reader io.Reader) ([]byte, error) {
 	}
 }
 
+// pairing URI 是单行值；读取到换行就提交，让交互终端粘贴后按 Enter 即可。
+// EOF 仍视为正常结束，因此 `printf %s "$URI" | starcat pair` 等管道不需要补换行。
+func readLineContext(ctx context.Context, reader io.Reader) (string, error) {
+	type result struct {
+		line string
+		err  error
+	}
+	results := make(chan result, 1)
+	go func() {
+		line, err := bufio.NewReader(reader).ReadString('\n')
+		if errors.Is(err, io.EOF) && line != "" {
+			err = nil
+		}
+		results <- result{line: strings.TrimSpace(line), err: err}
+	}()
+
+	select {
+	case <-ctx.Done():
+		return "", ctx.Err()
+	case result := <-results:
+		return result.line, result.err
+	}
+}
+
 // isInteractiveReader 区分真实终端与 Agent 常用的 pipe/file stdin，避免污染自动化 stderr。
 func isInteractiveReader(reader io.Reader) bool {
 	file, ok := reader.(*os.File)
@@ -467,10 +583,7 @@ func interactiveNotePrompt() string {
 }
 
 func pairingInputPrompt() string {
-	if runtime.GOOS == "windows" {
-		return "Paste the one-time pairing URI, then press Ctrl+Z and Enter to submit. Press Ctrl+C to cancel."
-	}
-	return "Paste the one-time pairing URI, then press Ctrl+D to submit. Press Ctrl+C to cancel."
+	return "Paste the one-time pairing URI, then press Enter to pair. Press Ctrl+C to cancel."
 }
 
 func repoSelector(value string) (map[string]any, error) {
@@ -481,7 +594,9 @@ func repoSelector(value string) (map[string]any, error) {
 	return map[string]any{"owner": parts[0], "name": parts[1]}, nil
 }
 
-func parseFlags(args []string, valueFlags map[string]bool) ([]string, map[string][]string, error) {
+// parseFlags 的 allowedFlags value 表示该 flag 是否必须带值。所有未声明 flag 都报错，
+// 避免拼写错误或已经删除的参数被静默忽略。
+func parseFlags(args []string, allowedFlags map[string]bool) ([]string, map[string][]string, error) {
 	positionals := make([]string, 0, len(args))
 	flags := make(map[string][]string)
 	for index := 0; index < len(args); index++ {
@@ -491,11 +606,11 @@ func parseFlags(args []string, valueFlags map[string]bool) ([]string, map[string
 			continue
 		}
 		name := strings.TrimPrefix(item, "--")
-		if name == "json" { // 所有命令本来就只输出 JSON，保留该 flag 方便 Agent 明确意图。
-			flags[name] = nil
-			continue
+		requiresValue, allowed := allowedFlags[name]
+		if !allowed {
+			return nil, nil, fmt.Errorf("unknown flag %q", item)
 		}
-		if valueFlags != nil && valueFlags[name] {
+		if requiresValue {
 			if index+1 >= len(args) || strings.HasPrefix(args[index+1], "--") {
 				return nil, nil, fmt.Errorf("--%s requires a value", name)
 			}
@@ -533,27 +648,93 @@ func intFlag(flags map[string][]string, name string, fallback, minimum, maximum 
 	return value, nil
 }
 
-const usage = `starcat CLI
+const usage = `Starcat CLI
+
+Usage:
+  starcat <command> [options]
 
 Pairing and diagnostics:
-  starcat pair --stdin
-  starcat unpair
-  starcat doctor --json
-  starcat capabilities --json
-  starcat update
+  pair [one-time-pairing-URI]  Pair with Starcat; without an argument, paste the URI and press Enter
+  unpair                        Remove the paired device credential
+  doctor [--json]              Check pairing, connection, tools, and capabilities
+  update                        Update a standalone Starcat CLI installation
+
+Information:
+  capabilities                  Print Starcat capabilities as JSON
+  version                       Print the CLI version
 
 MCP server:
-  starcat mcp
+  mcp                           Start the stdio MCP bridge
 
 Read commands:
+  repo search <query> [--scope starred|knowledge|all] [--limit N] [--semantic]
+  repo context <owner/name>
+  repo readme <owner/name>
+  repo summary <owner/name> [--generate] [--allow-external-context]
+  tags list
+
+Write commands (dry-run by default; --apply persists changes):
+  repo note set <owner/name> --stdin [--apply]
+  repo status set <owner/name> <unread|read|using> [--apply]
+  repo tags <add|remove|replace> <owner/name> <tag...> [--apply]
+  tag create <name> [--color HEX] [--icon SYMBOL] [--apply]
+
+Run "starcat help <command>" for command-specific help.`
+
+var commandHelp = map[string]string{
+	"pair": `Pair a device with Starcat
+
+Usage:
+  starcat pair [one-time-pairing-URI]
+
+Without an argument, paste the one-time URI and press Enter. Starcat pairing
+commands expire after five minutes, work only once, and still require approval
+inside the Starcat app.`,
+	"doctor": `Check the Starcat CLI connection
+
+Usage:
+  starcat doctor [--json]
+
+The default output is formatted for a terminal. Use --json only when a script
+or agent needs a machine-readable result.`,
+	"capabilities": `Print Starcat capabilities
+
+Usage:
+  starcat capabilities
+
+Capabilities are always written as JSON.`,
+	"repo": `Read or update Starcat repositories
+
+Usage:
   starcat repo search <query> [--scope starred|knowledge|all] [--limit N] [--semantic]
   starcat repo context <owner/name>
   starcat repo readme <owner/name>
   starcat repo summary <owner/name> [--generate] [--allow-external-context]
-  starcat tags list
-
-Write commands (dry-run by default; --apply persists changes):
   starcat repo note set <owner/name> --stdin [--apply]
   starcat repo status set <owner/name> <unread|read|using> [--apply]
-  starcat repo tags <add|remove|replace> <owner/name> <tag...> [--apply]
-  starcat tag create <name> [--color HEX] [--icon SYMBOL] [--apply]`
+  starcat repo tags <add|remove|replace> <owner/name> <tag...> [--apply]`,
+	"tags": `List Starcat tags
+
+Usage:
+  starcat tags list`,
+	"tag": `Create a Starcat tag
+
+Usage:
+  starcat tag create <name> [--color HEX] [--icon SYMBOL] [--apply]`,
+	"mcp": `Start the Starcat stdio MCP bridge
+
+Usage:
+  starcat mcp`,
+	"unpair": `Remove the paired device credential
+
+Usage:
+  starcat unpair`,
+	"update": `Update a standalone Starcat CLI installation
+
+Usage:
+  starcat update`,
+	"version": `Print the Starcat CLI version
+
+Usage:
+  starcat version`,
+}
