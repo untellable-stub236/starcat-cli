@@ -4,7 +4,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$Repository = if ($env:STARCAT_GITHUB_REPOSITORY) { $env:STARCAT_GITHUB_REPOSITORY } else { "dong4j/starcat-cli" }
+$Repository = if ($env:STARCAT_GITHUB_REPOSITORY) { $env:STARCAT_GITHUB_REPOSITORY } else { "starcat-app/starcat-cli" }
 if (-not $InstallDir) {
     $InstallDir = Join-Path $HOME ".local\bin"
 }

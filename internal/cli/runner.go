@@ -13,11 +13,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/dong4j/starcat-cli/internal/config"
-	"github.com/dong4j/starcat-cli/internal/credential"
-	"github.com/dong4j/starcat-cli/internal/mcp"
-	"github.com/dong4j/starcat-cli/internal/pairing"
-	"github.com/dong4j/starcat-cli/internal/updater"
+	"github.com/starcat-app/starcat-cli/internal/config"
+	"github.com/starcat-app/starcat-cli/internal/credential"
+	"github.com/starcat-app/starcat-cli/internal/mcp"
+	"github.com/starcat-app/starcat-cli/internal/pairing"
+	"github.com/starcat-app/starcat-cli/internal/updater"
 )
 
 const (

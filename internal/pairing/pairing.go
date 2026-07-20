@@ -16,9 +16,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dong4j/starcat-cli/internal/config"
-	"github.com/dong4j/starcat-cli/internal/credential"
-	"github.com/dong4j/starcat-cli/internal/mcp"
+	"github.com/starcat-app/starcat-cli/internal/config"
+	"github.com/starcat-app/starcat-cli/internal/credential"
+	"github.com/starcat-app/starcat-cli/internal/mcp"
 )
 
 // Invitation 是 Starcat 生成的短期连接资料。

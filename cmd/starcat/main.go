@@ -9,9 +9,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/dong4j/starcat-cli/internal/cli"
-	"github.com/dong4j/starcat-cli/internal/mcp"
-	"github.com/dong4j/starcat-cli/internal/updater"
+	"github.com/starcat-app/starcat-cli/internal/cli"
+	"github.com/starcat-app/starcat-cli/internal/mcp"
+	"github.com/starcat-app/starcat-cli/internal/updater"
 )
 
 func main() {

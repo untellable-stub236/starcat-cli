@@ -36,7 +36,7 @@ for target in "${targets[@]}"; do
 
   CGO_ENABLED=0 GOOS="${target_os}" GOARCH="${target_arch}" \
     go build -trimpath \
-      -ldflags "-s -w -X github.com/dong4j/starcat-cli/internal/mcp.Version=${version}" \
+      -ldflags "-s -w -X github.com/starcat-app/starcat-cli/internal/mcp.Version=${version}" \
       -o "${stage_dir}/${binary_name}" \
       "${project_dir}/cmd/starcat"
 

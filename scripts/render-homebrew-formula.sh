@@ -32,26 +32,26 @@ mkdir -p "$(dirname "${output}")"
 {
   echo 'class Starcat < Formula'
   echo '  desc "Cross-platform CLI and MCP bridge for Starcat"'
-  echo '  homepage "https://github.com/dong4j/starcat-cli"'
+  echo '  homepage "https://github.com/starcat-app/starcat-cli"'
   echo '  license "MIT"'
   echo "  version \"${formula_version}\""
   echo
   echo '  on_macos do'
   echo '    if Hardware::CPU.arm?'
-  echo "      url \"https://github.com/dong4j/starcat-cli/releases/download/${version}/starcat_${version}_darwin_arm64.tar.gz\""
+  echo "      url \"https://github.com/starcat-app/starcat-cli/releases/download/${version}/starcat_${version}_darwin_arm64.tar.gz\""
   echo "      sha256 \"${darwin_arm64}\""
   echo '    else'
-  echo "      url \"https://github.com/dong4j/starcat-cli/releases/download/${version}/starcat_${version}_darwin_amd64.tar.gz\""
+  echo "      url \"https://github.com/starcat-app/starcat-cli/releases/download/${version}/starcat_${version}_darwin_amd64.tar.gz\""
   echo "      sha256 \"${darwin_amd64}\""
   echo '    end'
   echo '  end'
   echo
   echo '  on_linux do'
   echo '    if Hardware::CPU.arm?'
-  echo "      url \"https://github.com/dong4j/starcat-cli/releases/download/${version}/starcat_${version}_linux_arm64.tar.gz\""
+  echo "      url \"https://github.com/starcat-app/starcat-cli/releases/download/${version}/starcat_${version}_linux_arm64.tar.gz\""
   echo "      sha256 \"${linux_arm64}\""
   echo '    else'
-  echo "      url \"https://github.com/dong4j/starcat-cli/releases/download/${version}/starcat_${version}_linux_amd64.tar.gz\""
+  echo "      url \"https://github.com/starcat-app/starcat-cli/releases/download/${version}/starcat_${version}_linux_amd64.tar.gz\""
   echo "      sha256 \"${linux_amd64}\""
   echo '    end'
   echo '  end'

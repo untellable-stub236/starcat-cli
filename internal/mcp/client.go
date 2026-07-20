@@ -18,7 +18,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dong4j/starcat-cli/internal/config"
+	"github.com/starcat-app/starcat-cli/internal/config"
 )
 
 const MCPProtocolVersion = "2025-03-26"

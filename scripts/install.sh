@@ -3,7 +3,7 @@
 
 set -eu
 
-repository="${STARCAT_GITHUB_REPOSITORY:-dong4j/starcat-cli}"
+repository="${STARCAT_GITHUB_REPOSITORY:-starcat-app/starcat-cli}"
 install_dir="${STARCAT_INSTALL_DIR:-${HOME}/.local/bin}"
 version="${STARCAT_VERSION:-}"
 

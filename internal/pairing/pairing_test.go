@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dong4j/starcat-cli/internal/config"
+	"github.com/starcat-app/starcat-cli/internal/config"
 )
 
 func TestParseInvitation(t *testing.T) {

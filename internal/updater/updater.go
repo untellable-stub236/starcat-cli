@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	defaultAPIURL    = "https://api.github.com/repos/dong4j/starcat-cli/releases/latest"
+	defaultAPIURL    = "https://api.github.com/repos/starcat-app/starcat-cli/releases/latest"
 	maxMetadataBytes = 2 << 20
 	maxArchiveBytes  = 128 << 20
 	maxBinaryBytes   = 64 << 20

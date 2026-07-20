@@ -2,9 +2,9 @@
 
 ## Repository setup
 
-1. Create the public repositories `dong4j/starcat-cli` and `dong4j/homebrew-starcat-cli`.
+1. Create the public repositories `starcat-app/starcat-cli` and `starcat-app/homebrew-starcat-cli`.
 2. Push both repositories with `main` as the default branch.
-3. Add a fine-grained `HOMEBREW_TAP_TOKEN` Actions secret to `dong4j/starcat-cli`. It only needs Contents read/write permission for `dong4j/homebrew-starcat-cli`.
+3. Add a fine-grained `HOMEBREW_TAP_TOKEN` Actions secret to `starcat-app/starcat-cli`. It only needs Contents read/write permission for `starcat-app/homebrew-starcat-cli`.
 4. Enable GitHub Actions and artifact attestations.
 
 ## Publish a release

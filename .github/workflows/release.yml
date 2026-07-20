@@ -29,11 +29,11 @@ jobs:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
           if [[ -z "${HOMEBREW_TAP_TOKEN}" ]]; then
-            echo "HOMEBREW_TAP_TOKEN is required to update dong4j/homebrew-starcat-cli" >&2
+            echo "HOMEBREW_TAP_TOKEN is required to update starcat-app/homebrew-starcat-cli" >&2
             exit 1
           fi
           git clone \
-            "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/dong4j/homebrew-starcat-cli.git" \
+            "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/starcat-app/homebrew-starcat-cli.git" \
             "${RUNNER_TEMP}/homebrew-starcat-cli"
       - name: Verify and test
         run: |

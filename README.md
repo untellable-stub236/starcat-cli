@@ -1,6 +1,6 @@
 # Starcat CLI
 
-[![CI](https://github.com/dong4j/starcat-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/dong4j/starcat-cli/actions/workflows/ci.yml)
+[![CI](https://github.com/starcat-app/starcat-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/starcat-app/starcat-cli/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
 `starcat` is the cross-platform command-line client for Starcat and a stdio MCP server for AI agents such as Codex and Claude Code.
@@ -22,29 +22,29 @@ The Starcat app still runs on macOS. The CLI may run on the same Mac or connect 
 ### Homebrew
 
 ```bash
-brew tap dong4j/starcat-cli
+brew tap starcat-app/starcat-cli
 brew install starcat
 ```
 
-The tap repository is `dong4j/homebrew-starcat-cli`; the installed command is `starcat`.
+The tap repository is `starcat-app/homebrew-starcat-cli`; the installed command is `starcat`.
 
 ### macOS and Linux install script
 
 ```bash
-curl -fsSL https://github.com/dong4j/starcat-cli/releases/latest/download/install.sh | sh
+curl -fsSL https://github.com/starcat-app/starcat-cli/releases/latest/download/install.sh | sh
 ```
 
 The default destination is `~/.local/bin/starcat`. Override it when needed:
 
 ```bash
-curl -fsSL https://github.com/dong4j/starcat-cli/releases/latest/download/install.sh \
+curl -fsSL https://github.com/starcat-app/starcat-cli/releases/latest/download/install.sh \
   | STARCAT_INSTALL_DIR=/custom/bin sh
 ```
 
 ### Windows PowerShell
 
 ```powershell
-irm https://github.com/dong4j/starcat-cli/releases/latest/download/install.ps1 | iex
+irm https://github.com/starcat-app/starcat-cli/releases/latest/download/install.ps1 | iex
 ```
 
 The default destination is `$HOME\.local\bin\starcat.exe`.
@@ -144,7 +144,7 @@ go build -o bin/starcat ./cmd/starcat
 Release builds inject a semantic version:
 
 ```bash
-go build -ldflags "-X github.com/dong4j/starcat-cli/internal/mcp.Version=v0.1.0" ./cmd/starcat
+go build -ldflags "-X github.com/starcat-app/starcat-cli/internal/mcp.Version=v0.1.0" ./cmd/starcat
 ```
 
 `scripts/build-all.sh v0.1.0` creates the five platform archives, installers, and `checksums.txt` under `dist/`. It does not create tags or publish a release.

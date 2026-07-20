@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dong4j/starcat-cli/internal/config"
-	"github.com/dong4j/starcat-cli/internal/updater"
+	"github.com/starcat-app/starcat-cli/internal/config"
+	"github.com/starcat-app/starcat-cli/internal/updater"
 )
 
 func TestRepoNoteRejectsDisabledWritesBeforeReadingStdin(t *testing.T) {

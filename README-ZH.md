@@ -19,16 +19,16 @@ Starcat App 仍运行在 macOS；CLI 可以运行在同一台 Mac，也可以从
 ### Homebrew
 
 ```bash
-brew tap dong4j/starcat-cli
+brew tap starcat-app/starcat-cli
 brew install starcat
 ```
 
-Tap 仓库名为 `dong4j/homebrew-starcat-cli`，安装后的命令仍是 `starcat`。
+Tap 仓库名为 `starcat-app/homebrew-starcat-cli`，安装后的命令仍是 `starcat`。
 
 ### macOS / Linux 一键安装
 
 ```bash
-curl -fsSL https://github.com/dong4j/starcat-cli/releases/latest/download/install.sh | sh
+curl -fsSL https://github.com/starcat-app/starcat-cli/releases/latest/download/install.sh | sh
 ```
 
 默认安装到 `~/.local/bin/starcat`，可通过 `STARCAT_INSTALL_DIR` 覆盖。
@@ -36,7 +36,7 @@ curl -fsSL https://github.com/dong4j/starcat-cli/releases/latest/download/instal
 ### Windows PowerShell
 
 ```powershell
-irm https://github.com/dong4j/starcat-cli/releases/latest/download/install.ps1 | iex
+irm https://github.com/starcat-app/starcat-cli/releases/latest/download/install.ps1 | iex
 ```
 
 默认安装到 `$HOME\.local\bin\starcat.exe`。安装脚本会从 GitHub Release 下载当前平台资产，并先使用 `checksums.txt` 校验 SHA-256。

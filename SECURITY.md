@@ -2,7 +2,7 @@
 
 ## Reporting a vulnerability
 
-Please report suspected vulnerabilities through GitHub Security Advisories for `dong4j/starcat-cli`. Do not publish credentials, pairing URIs, exploit details, or private Starcat data in a public issue.
+Please report suspected vulnerabilities through GitHub Security Advisories for `starcat-app/starcat-cli`. Do not publish credentials, pairing URIs, exploit details, or private Starcat data in a public issue.
 
 Include the affected CLI version, operating system and architecture, reproduction steps, and the expected security impact. You should receive an acknowledgement within seven days.
 

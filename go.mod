@@ -1,4 +1,4 @@
-module github.com/dong4j/starcat-cli
+module github.com/starcat-app/starcat-cli
 
 go 1.25.0
 
