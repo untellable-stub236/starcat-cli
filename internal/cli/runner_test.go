@@ -132,6 +132,46 @@ func TestUnknownFlagsAreRejected(t *testing.T) {
 	}
 }
 
+func TestStatisticsCommandsRenderTerminalFriendlyOutput(t *testing.T) {
+	runner, closeServer := newStatisticsRunner(t)
+	defer closeServer()
+	var stdout bytes.Buffer
+	runner.Stdout = &stdout
+
+	if err := runner.Run(context.Background(), []string{"stats"}); err != nil {
+		t.Fatalf("Run(stats) error = %v", err)
+	}
+	if strings.HasPrefix(strings.TrimSpace(stdout.String()), "{") || !strings.Contains(stdout.String(), "Starcat Statistics") {
+		t.Fatalf("stats stdout = %q, want terminal overview", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "Starred: 12") || !strings.Contains(stdout.String(), "Total tokens: 420") {
+		t.Fatalf("stats stdout = %q, want repository and token counts", stdout.String())
+	}
+
+	stdout.Reset()
+	if err := runner.Run(context.Background(), []string{"stats", "ai", "--range", "30d", "--provider", "provider-a"}); err != nil {
+		t.Fatalf("Run(stats ai) error = %v", err)
+	}
+	if !strings.Contains(stdout.String(), "Starcat AI Usage (last 30 days)") || !strings.Contains(stdout.String(), "By provider") {
+		t.Fatalf("stats ai stdout = %q", stdout.String())
+	}
+
+	stdout.Reset()
+	if err := runner.Run(context.Background(), []string{"stats", "knowledge"}); err != nil {
+		t.Fatalf("Run(stats knowledge) error = %v", err)
+	}
+	if !strings.Contains(stdout.String(), "Starcat Knowledge Base Statistics") || !strings.Contains(stdout.String(), "Active chunks: 24") {
+		t.Fatalf("stats knowledge stdout = %q", stdout.String())
+	}
+}
+
+func TestStatisticsCommandsRejectJSONFlag(t *testing.T) {
+	runner := &Runner{Stdout: io.Discard}
+	if err := runner.Run(context.Background(), []string{"stats", "--json"}); err == nil || !strings.Contains(err.Error(), "unknown stats subcommand") {
+		t.Fatalf("stats --json error = %v, want removed-flag rejection", err)
+	}
+}
+
 func TestRepoNotePipeInputDoesNotPrintInteractivePrompt(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -200,6 +240,83 @@ type writeCalls struct {
 	upsertNote  int
 	noteContent string
 	noteDryRun  bool
+}
+
+func newStatisticsRunner(t *testing.T) (*Runner, func()) {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		var message map[string]any
+		if err := json.NewDecoder(request.Body).Decode(&message); err != nil {
+			http.Error(writer, err.Error(), http.StatusBadRequest)
+			return
+		}
+		switch message["method"] {
+		case "initialize":
+			writeMCPResult(writer, message["id"], map[string]any{"protocolVersion": "2025-03-26"})
+		case "notifications/initialized":
+			writer.WriteHeader(http.StatusAccepted)
+		case "tools/call":
+			params, _ := message["params"].(map[string]any)
+			tool, _ := params["name"].(string)
+			switch tool {
+			case "starcat.get_overview_statistics":
+				writeMCPToolResult(writer, message["id"], map[string]any{
+					"generated_at": "2026-07-20T00:00:00Z", "starred_repository_count": 12,
+					"knowledge_base_project_count": 7, "retained_after_unstar_count": 2, "tag_count": 3,
+					"ai_usage_time_range": "all", "ai_usage": statisticsUsageFixture(),
+					"rag_index": statisticsRAGFixture(), "excluded_chunk_count": 1,
+				})
+			case "starcat.get_ai_usage_statistics":
+				writeMCPToolResult(writer, message["id"], map[string]any{
+					"generated_at": "2026-07-20T00:00:00Z", "time_range": "thirty_days",
+					"provider_id": "provider-a", "summary": statisticsUsageFixture(),
+					"daily": []any{}, "by_feature": []any{},
+					"by_provider": []any{map[string]any{"key": "provider-a", "total_tokens": 420, "call_count": 4}},
+					"by_model":    []any{},
+				})
+			case "starcat.get_knowledge_base_statistics":
+				writeMCPToolResult(writer, message["id"], map[string]any{
+					"generated_at": "2026-07-20T00:00:00Z", "project_count": 7,
+					"starred_project_count": 5, "retained_after_unstar_count": 2,
+					"tagged_project_count": 4, "untagged_project_count": 3, "tag_count": 3,
+					"known_language_project_count": 6, "unknown_language_project_count": 1,
+					"added_in_last_30_days_count": 2, "pushed_in_last_30_days_count": 4,
+					"ai_summary_project_count": 3, "private_notes_exposed": false,
+					"status_counts": []any{}, "top_languages": []any{}, "top_tags": []any{},
+					"source_index_coverage": []any{}, "excluded_chunk_count": 1,
+					"without_readme_source_project_count": 1, "without_indexable_source_project_count": 0,
+					"top_starred_repositories": []any{}, "index_health": statisticsRAGFixture(),
+				})
+			default:
+				http.Error(writer, "unexpected tool: "+tool, http.StatusBadRequest)
+			}
+		default:
+			http.Error(writer, "unexpected MCP method", http.StatusBadRequest)
+		}
+	}))
+
+	profile := config.Profile{
+		Endpoint: server.URL + "/mcp", DeviceID: "device-1", ProtocolVersion: config.CurrentProtocolVersion,
+	}
+	return &Runner{
+		Profiles: staticProfileStore{profile: profile}, Credentials: staticCredentialStore{token: "test-token"},
+		Stdin: strings.NewReader(""), Stdout: io.Discard, Stderr: io.Discard,
+	}, server.Close
+}
+
+func statisticsUsageFixture() map[string]any {
+	return map[string]any{
+		"total_tokens": 420, "input_tokens": 300, "output_tokens": 120,
+		"call_count": 4, "successful_call_count": 3, "calls_with_usage": 3,
+		"embedding_item_count": 8, "success_rate": 0.75, "usage_availability_rate": 0.75,
+	}
+}
+
+func statisticsRAGFixture() map[string]any {
+	return map[string]any{
+		"total_chunks": 24, "ready_chunks": 18, "keyword_only_chunks": 2,
+		"pending_chunks": 1, "failed_chunks": 1, "stale_chunks": 2, "embedding_model": "embed-v1",
+	}
 }
 
 func newWriteRunner(t *testing.T, stdin io.Reader, localWrites bool) (*Runner, *writeCalls, func()) {

@@ -80,6 +80,9 @@ After pairing, configure the AI agent with a user-level MCP server:
 ```bash
 starcat help
 starcat capabilities
+starcat stats
+starcat stats ai --range 30d
+starcat stats knowledge
 starcat repo search "local RAG" --scope starred --limit 20
 starcat repo context owner/repo
 starcat repo readme owner/repo
@@ -87,7 +90,9 @@ starcat repo summary owner/repo
 starcat tags list
 ```
 
-`help`, `version`, `pair`, `unpair`, `doctor`, and `update` use terminal-friendly output. Data commands such as `capabilities`, `repo`, and `tags` write JSON. `starcat doctor --json` is available only when automation needs a machine-readable diagnostic result.
+`help`, `version`, `pair`, `unpair`, `doctor`, `update`, and all `stats` commands use terminal-friendly output. Statistics commands intentionally have no `--json` flag because agents receive the same data as structured results through `starcat mcp`. Existing data commands such as `capabilities`, `repo`, and `tags` write JSON. `starcat doctor --json` is available only when automation needs a machine-readable diagnostic result.
+
+Statistics are read-only local aggregates. `starcat stats` shows the common Star, knowledge-base, AI token, and RAG chunk counts; `stats ai` supports `--range`, `--feature`, `--provider`, and `--model`; `stats knowledge` shows source coverage and index health.
 
 Write operations are dry-run by default and require `--apply` to persist changes:
 

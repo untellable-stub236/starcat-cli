@@ -78,12 +78,17 @@ export STARCAT_NO_UPDATE_CHECK=1
 ```bash
 starcat help
 starcat capabilities
+starcat stats
+starcat stats ai --range 30d
+starcat stats knowledge
 starcat repo search "local RAG" --scope starred --limit 20
 starcat repo context owner/repo
 starcat repo readme owner/repo
 starcat repo summary owner/repo
 starcat tags list
 ```
+
+`starcat stats`、`starcat stats ai`、`starcat stats knowledge` 使用适合终端阅读的输出，并且故意不提供 `--json`。Agent 通过 `starcat mcp` 调用同一组统计工具，直接获得结构化结果。统计全部来自本地只读数据：概览覆盖 Star、知识库、AI Token 和 RAG 分片；AI 用量支持时间、功能、Provider、Model 筛选；知识库统计包含来源覆盖与索引健康度。
 
 `help`、`version`、`pair`、`unpair`、`doctor` 和 `update` 默认使用适合终端阅读的文本；`capabilities`、`repo`、`tags` 等数据命令直接输出 JSON。只有自动化确实需要机器可读诊断时才使用 `starcat doctor --json`。
 

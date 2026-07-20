@@ -93,6 +93,8 @@ func (r *Runner) Run(ctx context.Context, args []string) error {
 			return errors.New("Usage: starcat capabilities")
 		}
 		return r.call(ctx, "starcat.get_capabilities", map[string]any{})
+	case "stats":
+		return r.runStats(ctx, args[1:])
 	case "mcp":
 		if len(args) != 1 {
 			return errors.New("Usage: starcat mcp")
@@ -661,6 +663,9 @@ Pairing and diagnostics:
 
 Information:
   capabilities                  Print Starcat capabilities as JSON
+  stats                         Show Starcat repository, AI usage, and RAG statistics
+  stats ai [filters]            Show detailed AI token and call statistics
+  stats knowledge               Show detailed knowledge-base and chunk statistics
   version                       Print the CLI version
 
 MCP server:
@@ -703,6 +708,15 @@ Usage:
   starcat capabilities
 
 Capabilities are always written as JSON.`,
+	"stats": `Show Starcat statistics
+
+Usage:
+  starcat stats
+  starcat stats ai [--range today|7d|30d|all] [--feature NAME] [--provider ID] [--model NAME]
+  starcat stats knowledge
+
+Statistics commands call Starcat MCP tools and render the structured result in
+a terminal-friendly format. Agents should use the same tools through starcat mcp.`,
 	"repo": `Read or update Starcat repositories
 
 Usage:
