@@ -1,0 +1,164 @@
+// Package pairing 实现一次性 URI 配对。
+// URI 中的 secret 短时有效且只能兑换一次，长期设备 token 不进入命令行输出。
+package pairing
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"os"
+	"runtime"
+	"strings"
+	"time"
+
+	"github.com/dong4j/starcat-cli/internal/config"
+	"github.com/dong4j/starcat-cli/internal/credential"
+	"github.com/dong4j/starcat-cli/internal/mcp"
+)
+
+// Invitation 是 Starcat 生成的短期连接资料。
+type Invitation struct {
+	Endpoint    string
+	Fingerprint string
+	Secret      string
+}
+
+// ParseInvitation 严格限制 URI 结构，防止 Agent 把 token 发送到任意 endpoint。
+func ParseInvitation(raw string) (Invitation, error) {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || u.Scheme != "starcat-pair" || u.Host != "connect" {
+		return Invitation{}, errors.New("配对 URI 无效")
+	}
+	query := u.Query()
+	if query.Get("v") != config.CurrentProtocolVersion {
+		return Invitation{}, errors.New("配对 URI 协议版本不兼容")
+	}
+	invitation := Invitation{
+		Endpoint:    query.Get("endpoint"),
+		Fingerprint: query.Get("fingerprint"),
+		Secret:      query.Get("secret"),
+	}
+	if len(invitation.Secret) < 32 {
+		return Invitation{}, errors.New("配对 URI 的一次性 secret 无效")
+	}
+	probe := config.Profile{
+		Endpoint:          invitation.Endpoint,
+		CertificateSHA256: invitation.Fingerprint,
+		DeviceID:          "pairing-probe",
+		ProtocolVersion:   config.CurrentProtocolVersion,
+	}
+	if err := probe.Validate(); err != nil {
+		return Invitation{}, err
+	}
+	return invitation, nil
+}
+
+type exchangeRequest struct {
+	Secret       string `json:"secret"`
+	DeviceName   string `json:"device_name"`
+	Platform     string `json:"platform"`
+	Architecture string `json:"architecture"`
+	CLIVersion   string `json:"cli_version"`
+}
+
+type exchangeResponse struct {
+	DeviceID        string `json:"device_id"`
+	Token           string `json:"token"`
+	AppVersion      string `json:"app_version"`
+	ProtocolVersion string `json:"protocol_version"`
+}
+
+// Service 完成邀请兑换，并分别保存非敏感 profile 与系统安全存储中的 token。
+type Service struct {
+	Profiles    config.Store
+	Credentials credential.Store
+}
+
+func (s Service) Pair(ctx context.Context, rawURI string) (config.Profile, error) {
+	invitation, err := ParseInvitation(rawURI)
+	if err != nil {
+		return config.Profile{}, err
+	}
+	hostname, err := os.Hostname()
+	if err != nil || hostname == "" {
+		hostname = "unknown-device"
+	}
+	payload, err := json.Marshal(exchangeRequest{
+		Secret:       invitation.Secret,
+		DeviceName:   hostname,
+		Platform:     runtime.GOOS,
+		Architecture: runtime.GOARCH,
+		CLIVersion:   mcp.Version,
+	})
+	if err != nil {
+		return config.Profile{}, err
+	}
+
+	exchangeURL, err := pairingEndpoint(invitation.Endpoint)
+	if err != nil {
+		return config.Profile{}, err
+	}
+	client, err := mcp.NewHTTPClient(invitation.Endpoint, invitation.Fingerprint, 2*time.Minute)
+	if err != nil {
+		return config.Profile{}, err
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, exchangeURL, bytes.NewReader(payload))
+	if err != nil {
+		return config.Profile{}, err
+	}
+	request.Header.Set("Content-Type", "application/json")
+	response, err := client.Do(request)
+	if err != nil {
+		return config.Profile{}, fmt.Errorf("连接 Starcat 配对端点：%w", err)
+	}
+	defer response.Body.Close()
+	data, err := io.ReadAll(io.LimitReader(response.Body, 1<<20))
+	if err != nil {
+		return config.Profile{}, err
+	}
+	if response.StatusCode != http.StatusOK {
+		return config.Profile{}, fmt.Errorf("Starcat 拒绝配对（HTTP %d）：%s", response.StatusCode, strings.TrimSpace(string(data)))
+	}
+	var exchanged exchangeResponse
+	if err := json.Unmarshal(data, &exchanged); err != nil {
+		return config.Profile{}, fmt.Errorf("解析配对响应：%w", err)
+	}
+	if exchanged.DeviceID == "" || exchanged.Token == "" {
+		return config.Profile{}, errors.New("Starcat 配对响应缺少设备凭据")
+	}
+	profile := config.Profile{
+		Endpoint:          invitation.Endpoint,
+		CertificateSHA256: invitation.Fingerprint,
+		DeviceID:          exchanged.DeviceID,
+		AppVersion:        exchanged.AppVersion,
+		ProtocolVersion:   exchanged.ProtocolVersion,
+		PairedAt:          time.Now().UTC(),
+	}
+	if err := profile.Validate(); err != nil {
+		return config.Profile{}, err
+	}
+	if err := s.Credentials.Set(profile.DeviceID, exchanged.Token); err != nil {
+		return config.Profile{}, err
+	}
+	if err := s.Profiles.Save(profile); err != nil {
+		_ = s.Credentials.Delete(profile.DeviceID)
+		return config.Profile{}, err
+	}
+	return profile, nil
+}
+
+func pairingEndpoint(endpoint string) (string, error) {
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return "", err
+	}
+	u.Path = "/pairing/exchange"
+	u.RawQuery = ""
+	u.Fragment = ""
+	return u.String(), nil
+}
