@@ -10,6 +10,8 @@ import (
 	"syscall"
 
 	"github.com/dong4j/starcat-cli/internal/cli"
+	"github.com/dong4j/starcat-cli/internal/mcp"
+	"github.com/dong4j/starcat-cli/internal/updater"
 )
 
 func main() {
@@ -19,7 +21,11 @@ func main() {
 	if err == nil {
 		err = runner.Run(ctx, os.Args[1:])
 	}
-	if err == nil || errors.Is(err, context.Canceled) {
+	if err == nil {
+		updater.MaybeNotify(ctx, mcp.Version, os.Args[1:], os.Stderr)
+		return
+	}
+	if errors.Is(err, context.Canceled) {
 		return
 	}
 	// stdout 是 JSON/MCP 协议通道，所有错误只能写 stderr。

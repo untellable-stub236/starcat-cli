@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dong4j/starcat-cli/internal/config"
+	"github.com/dong4j/starcat-cli/internal/updater"
 )
 
 func TestRepoNoteRejectsDisabledWritesBeforeReadingStdin(t *testing.T) {
@@ -22,7 +23,7 @@ func TestRepoNoteRejectsDisabledWritesBeforeReadingStdin(t *testing.T) {
 	defer closeServer()
 
 	err := runner.Run(context.Background(), []string{"repo", "note", "set", "toptal/gitignore.io", "--stdin"})
-	if err == nil || !strings.Contains(err.Error(), "开启“允许本地写入”") {
+	if err == nil || !strings.Contains(err.Error(), "enable Allow Local Writes") {
 		t.Fatalf("Run() error = %v, want local-write guidance", err)
 	}
 	if stdin.read {
@@ -38,11 +39,37 @@ func TestRepoTagReplaceExplainsDestructiveWriteSetting(t *testing.T) {
 	defer closeServer()
 
 	err := runner.Run(context.Background(), []string{"repo", "tags", "replace", "toptal/gitignore.io", "agent"})
-	if err == nil || !strings.Contains(err.Error(), "开启“允许替换/删除写入”") {
+	if err == nil || !strings.Contains(err.Error(), "enable Allow Local Writes and Allow Replace/Delete Writes") {
 		t.Fatalf("Run() error = %v, want destructive-write guidance", err)
 	}
 	if calls.upsertNote != 0 {
 		t.Fatalf("unexpected write tool calls = %d", calls.upsertNote)
+	}
+}
+
+func TestPairOnlyAcceptsURIFromStdin(t *testing.T) {
+	runner := &Runner{Stdin: strings.NewReader("invalid"), Stdout: io.Discard, Stderr: io.Discard}
+	if err := runner.Run(context.Background(), []string{"pair", "starcat-pair://secret"}); err == nil || err.Error() != "Usage: starcat pair --stdin" {
+		t.Fatalf("pair argument error = %v", err)
+	}
+	if err := runner.Run(context.Background(), []string{"pair", "--stdin"}); err == nil || !strings.Contains(err.Error(), "invalid pairing URI") {
+		t.Fatalf("pair stdin error = %v", err)
+	}
+}
+
+func TestUpdateWritesMachineReadableResult(t *testing.T) {
+	var stdout bytes.Buffer
+	runner := &Runner{
+		Stdout: &stdout,
+		RunUpdate: func(context.Context, string) (updater.Result, error) {
+			return updater.Result{Updated: true, CurrentVersion: "v1.0.0", LatestVersion: "v1.1.0"}, nil
+		},
+	}
+	if err := runner.Run(context.Background(), []string{"update"}); err != nil {
+		t.Fatalf("Run(update) error = %v", err)
+	}
+	if !strings.Contains(stdout.String(), `"latest_version": "v1.1.0"`) {
+		t.Fatalf("update stdout = %q", stdout.String())
 	}
 }
 

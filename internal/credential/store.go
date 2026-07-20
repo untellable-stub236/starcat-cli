@@ -11,7 +11,7 @@ import (
 
 const service = "com.starcat.cli"
 
-var ErrNotFound = errors.New("未找到 Starcat 设备凭据，请重新配对")
+var ErrNotFound = errors.New("Starcat device credential was not found; pair the CLI again")
 
 // Store 是长期设备 token 的最小读写接口。
 type Store interface {
@@ -29,14 +29,14 @@ func (KeyringStore) Get(deviceID string) (string, error) {
 		return "", ErrNotFound
 	}
 	if err != nil {
-		return "", fmt.Errorf("读取系统安全存储：%w", err)
+		return "", fmt.Errorf("read system credential store: %w", err)
 	}
 	return value, nil
 }
 
 func (KeyringStore) Set(deviceID, token string) error {
 	if err := keyring.Set(service, deviceID, token); err != nil {
-		return fmt.Errorf("写入系统安全存储：%w", err)
+		return fmt.Errorf("write system credential store: %w", err)
 	}
 	return nil
 }
@@ -47,7 +47,7 @@ func (KeyringStore) Delete(deviceID string) error {
 		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("删除系统安全存储凭据：%w", err)
+		return fmt.Errorf("delete system credential: %w", err)
 	}
 	return nil
 }

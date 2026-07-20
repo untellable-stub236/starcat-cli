@@ -23,7 +23,7 @@ func BridgeStdio(ctx context.Context, transport *HTTPTransport, input io.Reader,
 			continue
 		}
 		if !json.Valid(line) {
-			return fmt.Errorf("stdin 包含无效 JSON-RPC 消息")
+			return fmt.Errorf("stdin contains an invalid JSON-RPC message")
 		}
 		status, body, err := transport.Send(ctx, line)
 		if err != nil {
@@ -34,7 +34,7 @@ func BridgeStdio(ctx context.Context, transport *HTTPTransport, input io.Reader,
 			continue
 		}
 		if _, err := writer.Write(append(body, '\n')); err != nil {
-			return fmt.Errorf("写入 MCP stdout：%w", err)
+			return fmt.Errorf("write MCP stdout: %w", err)
 		}
 		if err := writer.Flush(); err != nil {
 			return err

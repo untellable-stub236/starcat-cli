@@ -1,0 +1,80 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      # Clone the tap before publishing so an invalid token cannot leave a stable
+      # GitHub Release published without its matching Homebrew Formula update.
+      - name: Prepare Homebrew tap
+        if: ${{ !contains(github.ref_name, '-') }}
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          if [[ -z "${HOMEBREW_TAP_TOKEN}" ]]; then
+            echo "HOMEBREW_TAP_TOKEN is required to update dong4j/homebrew-starcat-cli" >&2
+            exit 1
+          fi
+          git clone \
+            "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/dong4j/homebrew-starcat-cli.git" \
+            "${RUNNER_TEMP}/homebrew-starcat-cli"
+      - name: Verify and test
+        run: |
+          go mod verify
+          go test ./...
+          go test -race ./...
+          go vet ./...
+          go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./...
+          bash -n scripts/*.sh
+      - name: Build release assets
+        run: scripts/build-all.sh "${GITHUB_REF_NAME}"
+      - name: Attest release assets
+        uses: actions/attest@v4
+        with:
+          subject-path: dist/*
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          release_args=()
+          if [[ "${GITHUB_REF_NAME}" == *-* ]]; then
+            release_args+=(--prerelease)
+          fi
+          gh release create "${GITHUB_REF_NAME}" dist/* "${release_args[@]}" \
+            --verify-tag \
+            --title "Starcat CLI ${GITHUB_REF_NAME}" \
+            --generate-notes
+      - name: Update Homebrew Formula
+        if: ${{ !contains(github.ref_name, '-') }}
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          tap_dir="${RUNNER_TEMP}/homebrew-starcat-cli"
+          scripts/render-homebrew-formula.sh \
+            "${GITHUB_REF_NAME}" \
+            dist/checksums.txt \
+            "${tap_dir}/Formula/starcat.rb"
+          git -C "${tap_dir}" config user.name "github-actions[bot]"
+          git -C "${tap_dir}" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C "${tap_dir}" add Formula/starcat.rb
+          if ! git -C "${tap_dir}" diff --cached --quiet; then
+            git -C "${tap_dir}" commit -m "starcat ${GITHUB_REF_NAME}"
+            git -C "${tap_dir}" push origin HEAD:main
+          fi

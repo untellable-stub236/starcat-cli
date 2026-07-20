@@ -32,11 +32,11 @@ type Invitation struct {
 func ParseInvitation(raw string) (Invitation, error) {
 	u, err := url.Parse(strings.TrimSpace(raw))
 	if err != nil || u.Scheme != "starcat-pair" || u.Host != "connect" {
-		return Invitation{}, errors.New("配对 URI 无效")
+		return Invitation{}, errors.New("invalid pairing URI")
 	}
 	query := u.Query()
 	if query.Get("v") != config.CurrentProtocolVersion {
-		return Invitation{}, errors.New("配对 URI 协议版本不兼容")
+		return Invitation{}, errors.New("pairing URI protocol version is not supported")
 	}
 	invitation := Invitation{
 		Endpoint:    query.Get("endpoint"),
@@ -44,7 +44,7 @@ func ParseInvitation(raw string) (Invitation, error) {
 		Secret:      query.Get("secret"),
 	}
 	if len(invitation.Secret) < 32 {
-		return Invitation{}, errors.New("配对 URI 的一次性 secret 无效")
+		return Invitation{}, errors.New("pairing URI contains an invalid one-time secret")
 	}
 	probe := config.Profile{
 		Endpoint:          invitation.Endpoint,
@@ -114,7 +114,7 @@ func (s Service) Pair(ctx context.Context, rawURI string) (config.Profile, error
 	request.Header.Set("Content-Type", "application/json")
 	response, err := client.Do(request)
 	if err != nil {
-		return config.Profile{}, fmt.Errorf("连接 Starcat 配对端点：%w", err)
+		return config.Profile{}, fmt.Errorf("connect to Starcat pairing endpoint: %w", err)
 	}
 	defer response.Body.Close()
 	data, err := io.ReadAll(io.LimitReader(response.Body, 1<<20))
@@ -122,14 +122,14 @@ func (s Service) Pair(ctx context.Context, rawURI string) (config.Profile, error
 		return config.Profile{}, err
 	}
 	if response.StatusCode != http.StatusOK {
-		return config.Profile{}, fmt.Errorf("Starcat 拒绝配对（HTTP %d）：%s", response.StatusCode, strings.TrimSpace(string(data)))
+		return config.Profile{}, fmt.Errorf("Starcat rejected pairing (HTTP %d): %s", response.StatusCode, strings.TrimSpace(string(data)))
 	}
 	var exchanged exchangeResponse
 	if err := json.Unmarshal(data, &exchanged); err != nil {
-		return config.Profile{}, fmt.Errorf("解析配对响应：%w", err)
+		return config.Profile{}, fmt.Errorf("decode pairing response: %w", err)
 	}
 	if exchanged.DeviceID == "" || exchanged.Token == "" {
-		return config.Profile{}, errors.New("Starcat 配对响应缺少设备凭据")
+		return config.Profile{}, errors.New("Starcat pairing response is missing the device credential")
 	}
 	profile := config.Profile{
 		Endpoint:          invitation.Endpoint,

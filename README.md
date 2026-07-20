@@ -1,31 +1,70 @@
-# starcat-cli
+# Starcat CLI
 
-`starcat-cli` 是 Starcat 的跨平台命令行客户端，也是 Codex、Claude Code 等 AI Agent 可使用的 stdio MCP Server。
+[![CI](https://github.com/dong4j/starcat-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/dong4j/starcat-cli/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
-CLI 不读取 Starcat 数据库，也不复制 App 的业务逻辑。所有读取和写入统一调用 Starcat 提供的 MCP Tools，因此权限、dry-run、Pro 校验和审计仍由 Starcat 控制。
+`starcat` is the cross-platform command-line client for Starcat and a stdio MCP server for AI agents such as Codex and Claude Code.
 
-## 支持平台
+The CLI never reads the Starcat database directly and does not duplicate application business logic. Every read and write goes through Starcat MCP tools, so permissions, dry-run behavior, Pro entitlement checks, and audit logging remain enforced by the Starcat app.
 
-- macOS `arm64` / `amd64`
-- Linux `arm64` / `amd64`
-- Windows `amd64`
+[中文说明](./README-ZH.md)
 
-Starcat App 仍运行在 macOS；CLI 可以运行在同一台 Mac，也可以从可信局域网或 Tailscale/WireGuard 网络中的其他设备连接。
+## Supported platforms
 
-## 配对
+- macOS: `arm64`, `amd64`
+- Linux: `arm64`, `amd64`
+- Windows: `amd64`
 
-在 Starcat 的「设置 → MCP 服务」中开启服务并点击「配对新设备」，然后执行复制出的命令：
+The Starcat app still runs on macOS. The CLI may run on the same Mac or connect from a trusted LAN, Tailscale, or WireGuard device.
+
+## Install
+
+### Homebrew
 
 ```bash
-starcat pair "starcat-pair://connect?..."
+brew tap dong4j/starcat-cli
+brew install starcat
+```
+
+The tap repository is `dong4j/homebrew-starcat-cli`; the installed command is `starcat`.
+
+### macOS and Linux install script
+
+```bash
+curl -fsSL https://github.com/dong4j/starcat-cli/releases/latest/download/install.sh | sh
+```
+
+The default destination is `~/.local/bin/starcat`. Override it when needed:
+
+```bash
+curl -fsSL https://github.com/dong4j/starcat-cli/releases/latest/download/install.sh \
+  | STARCAT_INSTALL_DIR=/custom/bin sh
+```
+
+### Windows PowerShell
+
+```powershell
+irm https://github.com/dong4j/starcat-cli/releases/latest/download/install.ps1 | iex
+```
+
+The default destination is `$HOME\.local\bin\starcat.exe`.
+
+Every installer downloads assets from GitHub Releases and verifies the archive against `checksums.txt` before installation.
+
+## Pair with Starcat
+
+In Starcat, open **Settings > MCP Service**, start the service, and copy a one-time pairing instruction. The URI is read from stdin so it does not appear in shell history or process arguments:
+
+```bash
+starcat pair --stdin
 starcat doctor --json
 ```
 
-配对 URI 五分钟后过期且只能使用一次。长期设备凭据保存在 macOS Keychain、Windows Credential Manager 或 Linux Secret Service，不写入项目文件。
+Paste the one-time URI into stdin and submit with `Ctrl+D` on macOS/Linux or `Ctrl+Z`, then Enter, on Windows. Pairing URIs expire after five minutes and can only be redeemed once. Long-lived device credentials are stored in macOS Keychain, Windows Credential Manager, or Linux Secret Service.
 
-## 作为 MCP Server
+## Configure an MCP client
 
-完成配对后，将 Agent 的 MCP Server 配置为：
+After pairing, configure the AI agent with a user-level MCP server:
 
 ```json
 {
@@ -34,9 +73,9 @@ starcat doctor --json
 }
 ```
 
-`starcat mcp` 将 stdin/stdout JSON-RPC 原样桥接到 Starcat 的 MCP Streamable HTTP endpoint。stdout 只输出 MCP 协议消息，诊断信息写入 stderr。
+`starcat mcp` bridges line-delimited JSON-RPC between stdio and Starcat MCP Streamable HTTP. Protocol messages are written only to stdout; diagnostics are written to stderr.
 
-## 常用命令
+## Commands
 
 ```bash
 starcat capabilities --json
@@ -47,39 +86,73 @@ starcat repo summary owner/repo
 starcat tags list
 ```
 
-写操作默认只 dry-run，必须显式添加 `--apply`：
+Write operations are dry-run by default and require `--apply` to persist changes:
 
 ```bash
-printf '%s' '一段私有笔记' | starcat repo note set owner/repo --stdin
-printf '%s' '一段私有笔记' | starcat repo note set owner/repo --stdin --apply
+printf '%s' 'A private note' | starcat repo note set owner/repo --stdin
+printf '%s' 'A private note' | starcat repo note set owner/repo --stdin --apply
 starcat repo tags add owner/repo Swift macOS --apply
 starcat repo status set owner/repo using --apply
 ```
 
-## 本地开发
+## Updates
+
+The CLI checks GitHub Releases at most once every 24 hours and displays an English notice only in an interactive terminal. It never prints update notices in `starcat mcp` or automated pipelines.
+
+Disable automatic checks:
 
 ```bash
+export STARCAT_NO_UPDATE_CHECK=1
+```
+
+Update a script-installed binary:
+
+```bash
+starcat update
+```
+
+Homebrew installations remain managed by Homebrew:
+
+```bash
+brew update
+brew upgrade starcat
+```
+
+## Security model
+
+- Plaintext HTTP is restricted to loopback addresses.
+- Remote connections require TLS 1.3 and the paired SHA-256 certificate fingerprint.
+- Each device receives an independent, revocable token.
+- Long-lived tokens are never written to command arguments, stdout, logs, or project files.
+- Downloaded update archives must match the SHA-256 release manifest.
+- Starcat MCP permissions remain the final authorization boundary.
+
+See [SECURITY.md](./SECURITY.md) for vulnerability reporting and threat-model details.
+
+## Development
+
+Requires Go 1.25 or newer. The module pins the release toolchain to Go 1.26.5 or newer so published binaries include the current standard-library security fixes.
+
+```bash
+go mod verify
 go test ./...
+go test -race ./...
 go vet ./...
 go build -o bin/starcat ./cmd/starcat
 ```
 
-发布构建通过 `-ldflags` 注入版本：
+Release builds inject a semantic version:
 
 ```bash
 go build -ldflags "-X github.com/dong4j/starcat-cli/internal/mcp.Version=v0.1.0" ./cmd/starcat
 ```
 
-维护者可以使用 `scripts/build-all.sh v0.1.0` 生成五个平台二进制和 `checksums.txt`。脚本不创建 tag，也不上传 GitHub Release。
+`scripts/build-all.sh v0.1.0` creates the five platform archives, installers, and `checksums.txt` under `dist/`. It does not create tags or publish a release.
 
-## 安全边界
+## Contributing
 
-- 明文 HTTP 只允许连接 `localhost` / loopback。
-- 远程连接必须使用 HTTPS，并 pin 配对 URI 中的 SHA-256 证书指纹。
-- 每台设备使用独立、可撤销的 token。
-- CLI 不在参数、stdout 或日志中输出长期 token。
-- Starcat 设置中的 MCP 写权限仍是最终授权边界。
+See [CONTRIBUTING.md](./CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md).
 
 ## License
 
-MIT
+MIT. Binary distributions also include [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md).

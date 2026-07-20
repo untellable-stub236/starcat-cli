@@ -1,0 +1,34 @@
+name: Bug report
+description: Report a reproducible Starcat CLI problem
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include pairing URIs, device tokens, private notes, or other secrets.
+  - type: input
+    id: version
+    attributes:
+      label: Starcat CLI version
+      placeholder: v0.1.0
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      placeholder: macOS arm64, Linux amd64, or Windows amd64
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true

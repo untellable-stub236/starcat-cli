@@ -1,8 +1,14 @@
 module github.com/dong4j/starcat-cli
 
-go 1.24
+go 1.25.0
 
-require github.com/zalando/go-keyring v0.2.8
+// Release binaries must use a toolchain that contains the GO-2026-5856 crypto/tls fix.
+toolchain go1.26.5
+
+require (
+	github.com/zalando/go-keyring v0.2.8
+	golang.org/x/mod v0.37.0
+)
 
 require (
 	github.com/danieljoos/wincred v1.2.3 // indirect

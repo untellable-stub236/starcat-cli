@@ -17,9 +17,13 @@ import (
 	"github.com/dong4j/starcat-cli/internal/credential"
 	"github.com/dong4j/starcat-cli/internal/mcp"
 	"github.com/dong4j/starcat-cli/internal/pairing"
+	"github.com/dong4j/starcat-cli/internal/updater"
 )
 
-const maxNoteBytes = 1 << 20
+const (
+	maxNoteBytes       = 1 << 20
+	maxPairingURIBytes = 16 << 10
+)
 
 // Runner 持有可替换依赖，生产入口和测试共享完全相同的命令路径。
 type Runner struct {
@@ -28,6 +32,7 @@ type Runner struct {
 	Stdin       io.Reader
 	Stdout      io.Writer
 	Stderr      io.Writer
+	RunUpdate   func(context.Context, string) (updater.Result, error)
 
 	// stdinInteractive 只控制人类可见提示；stdout 仍严格保留给 JSON/MCP 输出。
 	stdinInteractive bool
@@ -44,6 +49,7 @@ func NewRunner(stdin io.Reader, stdout, stderr io.Writer) (*Runner, error) {
 		Stdin:            stdin,
 		Stdout:           stdout,
 		Stderr:           stderr,
+		RunUpdate:        updater.NewClient().Update,
 		stdinInteractive: isInteractiveReader(stdin),
 	}, nil
 }
@@ -58,21 +64,21 @@ func (r *Runner) Run(ctx context.Context, args []string) error {
 	case "version", "--version":
 		return r.writeJSON(map[string]any{"version": mcp.Version})
 	case "pair":
-		if len(args) != 2 {
-			return errors.New("用法：starcat pair <starcat-pair://...>")
+		return r.runPair(ctx, args[1:])
+	case "unpair":
+		return r.unpair()
+	case "update":
+		if len(args) != 1 {
+			return errors.New("Usage: starcat update")
 		}
-		profile, err := (pairing.Service{Profiles: r.Profiles, Credentials: r.Credentials}).Pair(ctx, args[1])
+		if r.RunUpdate == nil {
+			return errors.New("the update service is unavailable")
+		}
+		result, err := r.RunUpdate(ctx, mcp.Version)
 		if err != nil {
 			return err
 		}
-		return r.writeJSON(map[string]any{
-			"paired":           true,
-			"device_id":        profile.DeviceID,
-			"endpoint":         profile.Endpoint,
-			"protocol_version": profile.ProtocolVersion,
-		})
-	case "unpair":
-		return r.unpair()
+		return r.writeJSON(result)
 	case "doctor":
 		return r.doctor(ctx)
 	case "capabilities":
@@ -89,17 +95,43 @@ func (r *Runner) Run(ctx context.Context, args []string) error {
 		if len(args) == 2 && args[1] == "list" {
 			return r.call(ctx, "starcat.list_tags", map[string]any{})
 		}
-		return errors.New("用法：starcat tags list")
+		return errors.New("Usage: starcat tags list")
 	case "tag":
 		return r.runTag(ctx, args[1:])
 	default:
-		return fmt.Errorf("未知命令 %q；运行 `starcat help` 查看用法", args[0])
+		return fmt.Errorf("unknown command %q; run `starcat help` for usage", args[0])
 	}
+}
+
+func (r *Runner) runPair(ctx context.Context, args []string) error {
+	if len(args) != 1 || args[0] != "--stdin" {
+		return errors.New("Usage: starcat pair --stdin")
+	}
+	if r.stdinInteractive && r.Stderr != nil {
+		fmt.Fprintln(r.Stderr, pairingInputPrompt())
+	}
+	rawURI, err := readAllContext(ctx, io.LimitReader(r.Stdin, maxPairingURIBytes+1))
+	if err != nil {
+		return fmt.Errorf("read pairing URI from stdin: %w", err)
+	}
+	if len(rawURI) > maxPairingURIBytes {
+		return fmt.Errorf("pairing URI exceeds the %d-byte limit", maxPairingURIBytes)
+	}
+	profile, err := (pairing.Service{Profiles: r.Profiles, Credentials: r.Credentials}).Pair(ctx, string(rawURI))
+	if err != nil {
+		return err
+	}
+	return r.writeJSON(map[string]any{
+		"paired":           true,
+		"device_id":        profile.DeviceID,
+		"endpoint":         profile.Endpoint,
+		"protocol_version": profile.ProtocolVersion,
+	})
 }
 
 func (r *Runner) runRepo(ctx context.Context, args []string) error {
 	if len(args) == 0 {
-		return errors.New("缺少 repo 子命令")
+		return errors.New("missing repo subcommand")
 	}
 	switch args[0] {
 	case "search":
@@ -108,7 +140,7 @@ func (r *Runner) runRepo(ctx context.Context, args []string) error {
 			return err
 		}
 		if len(positionals) != 1 {
-			return errors.New("用法：starcat repo search <query> [--scope starred|knowledge|all] [--limit N] [--semantic]")
+			return errors.New("Usage: starcat repo search <query> [--scope starred|knowledge|all] [--limit N] [--semantic]")
 		}
 		limit, err := intFlag(flags, "limit", 20, 1, 100)
 		if err != nil {
@@ -116,7 +148,7 @@ func (r *Runner) runRepo(ctx context.Context, args []string) error {
 		}
 		scope := valueFlag(flags, "scope", "starred")
 		if scope != "starred" && scope != "knowledge" && scope != "all" {
-			return errors.New("--scope 必须是 starred、knowledge 或 all")
+			return errors.New("--scope must be starred, knowledge, or all")
 		}
 		tool := "starcat.search_repos"
 		if hasFlag(flags, "semantic") {
@@ -129,7 +161,7 @@ func (r *Runner) runRepo(ctx context.Context, args []string) error {
 			return err
 		}
 		if len(positionals) != 1 {
-			return fmt.Errorf("用法：starcat repo %s <owner/name>", args[0])
+			return fmt.Errorf("Usage: starcat repo %s <owner/name>", args[0])
 		}
 		selector, err := repoSelector(positionals[0])
 		if err != nil {
@@ -152,7 +184,7 @@ func (r *Runner) runRepo(ctx context.Context, args []string) error {
 	case "tags":
 		return r.runRepoTags(ctx, args[1:])
 	default:
-		return fmt.Errorf("未知 repo 子命令 %q", args[0])
+		return fmt.Errorf("unknown repo subcommand %q", args[0])
 	}
 }
 
@@ -162,7 +194,7 @@ func (r *Runner) runRepoNote(ctx context.Context, args []string) error {
 		return err
 	}
 	if len(positionals) != 2 || positionals[0] != "set" || !hasFlag(flags, "stdin") {
-		return errors.New("用法：starcat repo note set <owner/name> --stdin [--apply]")
+		return errors.New("Usage: starcat repo note set <owner/name> --stdin [--apply]")
 	}
 	selector, err := repoSelector(positionals[1])
 	if err != nil {
@@ -180,10 +212,10 @@ func (r *Runner) runRepoNote(ctx context.Context, args []string) error {
 	}
 	content, err := readAllContext(ctx, io.LimitReader(r.Stdin, maxNoteBytes+1))
 	if err != nil {
-		return fmt.Errorf("读取笔记 stdin：%w", err)
+		return fmt.Errorf("read note from stdin: %w", err)
 	}
 	if len(content) > maxNoteBytes {
-		return errors.New("笔记超过 1 MiB 限制")
+		return errors.New("note exceeds the 1 MiB limit")
 	}
 	selector["content"] = string(content)
 	selector["dry_run"] = !hasFlag(flags, "apply")
@@ -196,11 +228,11 @@ func (r *Runner) runRepoStatus(ctx context.Context, args []string) error {
 		return err
 	}
 	if len(positionals) != 3 || positionals[0] != "set" {
-		return errors.New("用法：starcat repo status set <owner/name> <unread|read|using> [--apply]")
+		return errors.New("Usage: starcat repo status set <owner/name> <unread|read|using> [--apply]")
 	}
 	status := positionals[2]
 	if status != "unread" && status != "read" && status != "using" {
-		return errors.New("status 必须是 unread、read 或 using")
+		return errors.New("status must be unread, read, or using")
 	}
 	selector, err := repoSelector(positionals[1])
 	if err != nil {
@@ -217,7 +249,7 @@ func (r *Runner) runRepoTags(ctx context.Context, args []string) error {
 		return err
 	}
 	if len(positionals) < 3 {
-		return errors.New("用法：starcat repo tags <add|remove|replace> <owner/name> <tag...> [--apply]")
+		return errors.New("Usage: starcat repo tags <add|remove|replace> <owner/name> <tag...> [--apply]")
 	}
 	action := positionals[0]
 	tool, ok := map[string]string{
@@ -226,7 +258,7 @@ func (r *Runner) runRepoTags(ctx context.Context, args []string) error {
 		"replace": "starcat.set_repo_tags",
 	}[action]
 	if !ok {
-		return errors.New("标签操作必须是 add、remove 或 replace")
+		return errors.New("tag action must be add, remove, or replace")
 	}
 	selector, err := repoSelector(positionals[1])
 	if err != nil {
@@ -250,7 +282,7 @@ func (r *Runner) runTag(ctx context.Context, args []string) error {
 		return err
 	}
 	if len(positionals) != 2 || positionals[0] != "create" {
-		return errors.New("用法：starcat tag create <name> [--color '#0A84FF'] [--icon tag] [--apply]")
+		return errors.New("Usage: starcat tag create <name> [--color '#0A84FF'] [--icon tag] [--apply]")
 	}
 	arguments := map[string]any{"name": positionals[1], "dry_run": !hasFlag(flags, "apply")}
 	if value := valueFlag(flags, "color", ""); value != "" {
@@ -348,22 +380,22 @@ func (r *Runner) writeClient(ctx context.Context, capability string) (*mcp.Clien
 	}
 	capabilities, ok := value.(map[string]any)
 	if !ok {
-		return nil, errors.New("Starcat capabilities 响应格式无效")
+		return nil, errors.New("Starcat returned an invalid capabilities response")
 	}
 	enabled, ok := capabilities[capability].(bool)
 	if !ok {
-		return nil, fmt.Errorf("Starcat capabilities 响应缺少 %q", capability)
+		return nil, fmt.Errorf("Starcat capabilities response is missing %q", capability)
 	}
 	if enabled {
 		return client, nil
 	}
 	switch capability {
 	case "local_writes":
-		return nil, errors.New("Starcat 当前未允许本地写入；请前往 Starcat → 设置 → MCP 服务，开启“允许本地写入”后重试")
+		return nil, errors.New("local writes are disabled; open Starcat > Settings > MCP Service, enable Allow Local Writes, and try again")
 	case "destructive_writes":
-		return nil, errors.New("Starcat 当前未允许替换/删除写入；请前往 Starcat → 设置 → MCP 服务，先开启“允许本地写入”，再开启“允许替换/删除写入”后重试")
+		return nil, errors.New("replace/delete writes are disabled; open Starcat > Settings > MCP Service, enable Allow Local Writes and Allow Replace/Delete Writes, then try again")
 	default:
-		return nil, fmt.Errorf("Starcat 当前未启用写入能力 %q", capability)
+		return nil, fmt.Errorf("Starcat write capability %q is disabled", capability)
 	}
 }
 
@@ -429,15 +461,22 @@ func isInteractiveReader(reader io.Reader) bool {
 // interactiveNotePrompt 使用各平台真实的终端 EOF 快捷键，避免跨平台 CLI 给出错误操作指引。
 func interactiveNotePrompt() string {
 	if runtime.GOOS == "windows" {
-		return "正在从 stdin 读取笔记内容；输入完成后按 Ctrl+Z 再按 Enter 提交，按 Ctrl+C 取消。"
+		return "Reading note content from stdin. Press Ctrl+Z, then Enter to submit; press Ctrl+C to cancel."
 	}
-	return "正在从 stdin 读取笔记内容；输入完成后按 Ctrl+D 提交，按 Ctrl+C 取消。"
+	return "Reading note content from stdin. Press Ctrl+D to submit or Ctrl+C to cancel."
+}
+
+func pairingInputPrompt() string {
+	if runtime.GOOS == "windows" {
+		return "Paste the one-time pairing URI, then press Ctrl+Z and Enter to submit. Press Ctrl+C to cancel."
+	}
+	return "Paste the one-time pairing URI, then press Ctrl+D to submit. Press Ctrl+C to cancel."
 }
 
 func repoSelector(value string) (map[string]any, error) {
 	parts := strings.Split(value, "/")
 	if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" {
-		return nil, errors.New("仓库必须使用 owner/name 格式")
+		return nil, errors.New("repository must use owner/name format")
 	}
 	return map[string]any{"owner": parts[0], "name": parts[1]}, nil
 }
@@ -458,7 +497,7 @@ func parseFlags(args []string, valueFlags map[string]bool) ([]string, map[string
 		}
 		if valueFlags != nil && valueFlags[name] {
 			if index+1 >= len(args) || strings.HasPrefix(args[index+1], "--") {
-				return nil, nil, fmt.Errorf("--%s 缺少值", name)
+				return nil, nil, fmt.Errorf("--%s requires a value", name)
 			}
 			index++
 			flags[name] = []string{args[index]}
@@ -489,30 +528,31 @@ func intFlag(flags map[string][]string, name string, fallback, minimum, maximum 
 	}
 	value, err := strconv.Atoi(raw)
 	if err != nil || value < minimum || value > maximum {
-		return 0, fmt.Errorf("--%s 必须在 %d...%d 范围内", name, minimum, maximum)
+		return 0, fmt.Errorf("--%s must be between %d and %d", name, minimum, maximum)
 	}
 	return value, nil
 }
 
 const usage = `starcat CLI
 
-配对与诊断：
-  starcat pair <starcat-pair://...>
+Pairing and diagnostics:
+  starcat pair --stdin
   starcat unpair
   starcat doctor --json
   starcat capabilities --json
+  starcat update
 
-MCP Server：
+MCP server:
   starcat mcp
 
-读取：
+Read commands:
   starcat repo search <query> [--scope starred|knowledge|all] [--limit N] [--semantic]
   starcat repo context <owner/name>
   starcat repo readme <owner/name>
   starcat repo summary <owner/name> [--generate] [--allow-external-context]
   starcat tags list
 
-写入（默认 dry-run，显式 --apply 才持久化）：
+Write commands (dry-run by default; --apply persists changes):
   starcat repo note set <owner/name> --stdin [--apply]
   starcat repo status set <owner/name> <unread|read|using> [--apply]
   starcat repo tags <add|remove|replace> <owner/name> <tag...> [--apply]

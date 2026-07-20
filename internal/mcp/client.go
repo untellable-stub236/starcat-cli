@@ -41,19 +41,19 @@ func NewHTTPClient(endpoint, fingerprint string, timeout time.Duration) (*http.C
 	if u.Scheme == "https" {
 		expected := normalizeFingerprint(fingerprint)
 		if len(expected) != 64 {
-			return nil, errors.New("HTTPS 连接缺少有效证书指纹")
+			return nil, errors.New("HTTPS connection requires a valid certificate fingerprint")
 		}
 		transport.TLSClientConfig = &tls.Config{
 			MinVersion:         tls.VersionTLS13,
 			InsecureSkipVerify: true, // #nosec G402 -- 下方强制进行 SHA-256 pinning。
 			VerifyConnection: func(state tls.ConnectionState) error {
 				if len(state.PeerCertificates) == 0 {
-					return errors.New("Starcat 未提供 TLS 证书")
+					return errors.New("Starcat did not provide a TLS certificate")
 				}
 				digest := sha256.Sum256(state.PeerCertificates[0].Raw)
 				actual := hex.EncodeToString(digest[:])
 				if actual != expected {
-					return fmt.Errorf("Starcat TLS 证书指纹不匹配：expected=%s actual=%s", expected, actual)
+					return fmt.Errorf("Starcat TLS certificate fingerprint mismatch: expected=%s actual=%s", expected, actual)
 				}
 				return nil
 			},
@@ -86,18 +86,18 @@ func (t *HTTPTransport) Send(ctx context.Context, body []byte) (int, []byte, err
 
 	response, err := t.client.Do(request)
 	if err != nil {
-		return 0, nil, fmt.Errorf("连接 Starcat：%w", err)
+		return 0, nil, fmt.Errorf("connect to Starcat: %w", err)
 	}
 	defer response.Body.Close()
 	data, err := io.ReadAll(io.LimitReader(response.Body, 16<<20))
 	if err != nil {
-		return response.StatusCode, nil, fmt.Errorf("读取 Starcat 响应：%w", err)
+		return response.StatusCode, nil, fmt.Errorf("read Starcat response: %w", err)
 	}
 	if response.StatusCode == http.StatusUnauthorized {
-		return response.StatusCode, nil, errors.New("设备凭据已失效，请重新配对")
+		return response.StatusCode, nil, errors.New("device credential is no longer valid; pair the CLI again")
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return response.StatusCode, nil, fmt.Errorf("Starcat 返回 HTTP %d：%s", response.StatusCode, serverMessage(data))
+		return response.StatusCode, nil, fmt.Errorf("Starcat returned HTTP %d: %s", response.StatusCode, serverMessage(data))
 	}
 	return response.StatusCode, data, nil
 }
@@ -198,13 +198,13 @@ func (c *Client) request(ctx context.Context, method string, params map[string]a
 		} `json:"error"`
 	}
 	if err := json.Unmarshal(data, &response); err != nil {
-		return nil, fmt.Errorf("解析 JSON-RPC 响应：%w", err)
+		return nil, fmt.Errorf("decode JSON-RPC response: %w", err)
 	}
 	if response.Error != nil {
-		return nil, fmt.Errorf("MCP %d：%s", response.Error.Code, response.Error.Message)
+		return nil, fmt.Errorf("MCP %d: %s", response.Error.Code, response.Error.Message)
 	}
 	if response.Result == nil {
-		return nil, errors.New("JSON-RPC 响应缺少 result")
+		return nil, errors.New("JSON-RPC response is missing result")
 	}
 	return response.Result, nil
 }
@@ -247,7 +247,7 @@ func toolErrorMessage(result map[string]any) string {
 			}
 		}
 	}
-	return "Starcat MCP tool 调用失败"
+	return "Starcat MCP tool call failed"
 }
 
 func normalizeFingerprint(value string) string {
