@@ -21,9 +21,9 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
-      # Clone the tap before publishing so an invalid token cannot leave a stable
-      # GitHub Release published without its matching Homebrew Formula update.
-      - name: Prepare Homebrew tap
+      # Validate and check out the tap before publishing so an invalid token
+      # cannot leave a stable GitHub Release without its matching Formula update.
+      - name: Validate Homebrew tap token
         if: ${{ !contains(github.ref_name, '-') }}
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
@@ -32,9 +32,20 @@ jobs:
             echo "HOMEBREW_TAP_TOKEN is required to update starcat-app/homebrew-starcat-cli" >&2
             exit 1
           fi
-          git clone \
-            "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/starcat-app/homebrew-starcat-cli.git" \
-            "${RUNNER_TEMP}/homebrew-starcat-cli"
+          if [[ "${HOMEBREW_TAP_TOKEN}" =~ [[:space:]] ]]; then
+            echo "HOMEBREW_TAP_TOKEN must be a raw single-line token without whitespace" >&2
+            exit 1
+          fi
+      # Let actions/checkout configure Git authentication instead of embedding
+      # the secret in a clone URL, avoiding URL parsing and credential exposure risks.
+      - name: Check out Homebrew tap
+        if: ${{ !contains(github.ref_name, '-') }}
+        uses: actions/checkout@v6
+        with:
+          repository: starcat-app/homebrew-starcat-cli
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-starcat-cli
+          persist-credentials: true
       - name: Verify and test
         run: |
           go mod verify
@@ -63,10 +74,8 @@ jobs:
             --generate-notes
       - name: Update Homebrew Formula
         if: ${{ !contains(github.ref_name, '-') }}
-        env:
-          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
-          tap_dir="${RUNNER_TEMP}/homebrew-starcat-cli"
+          tap_dir="${GITHUB_WORKSPACE}/homebrew-starcat-cli"
           scripts/render-homebrew-formula.sh \
             "${GITHUB_REF_NAME}" \
             dist/checksums.txt \
