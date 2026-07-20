@@ -90,15 +90,15 @@ starcat repo summary owner/repo
 starcat tags list
 ```
 
-`help`, `version`, `pair`, `unpair`, `doctor`, `update`, and all `stats` commands use terminal-friendly output. Statistics commands intentionally have no `--json` flag because agents receive the same data as structured results through `starcat mcp`. Existing data commands such as `capabilities`, `repo`, and `tags` write JSON. `starcat doctor --json` is available only when automation needs a machine-readable diagnostic result.
+`help`, `version`, `pair`, `unpair`, `doctor`, `update`, and all `stats` commands use terminal-friendly output. They intentionally have no JSON-output flag because agents receive structured results through `starcat mcp`. Existing data commands such as `capabilities`, `repo`, and `tags` write JSON directly.
 
 Statistics are read-only local aggregates. `starcat stats` shows the common Star, knowledge-base, AI token, and RAG chunk counts; `stats ai` supports `--range`, `--feature`, `--provider`, and `--model`; `stats knowledge` shows source coverage and index health.
 
 Write operations are dry-run by default and require `--apply` to persist changes:
 
 ```bash
-printf '%s' 'A private note' | starcat repo note set owner/repo --stdin
-printf '%s' 'A private note' | starcat repo note set owner/repo --stdin --apply
+printf '%s' 'A private note' | starcat repo note set owner/repo
+printf '%s' 'A private note' | starcat repo note set owner/repo --apply
 starcat repo tags add owner/repo Swift macOS --apply
 starcat repo status set owner/repo using --apply
 ```

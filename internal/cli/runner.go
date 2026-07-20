@@ -87,7 +87,10 @@ func (r *Runner) Run(ctx context.Context, args []string) error {
 		}
 		return r.writeUpdateResult(result)
 	case "doctor":
-		return r.runDoctor(ctx, args[1:])
+		if len(args) != 1 {
+			return errors.New("Usage: starcat doctor")
+		}
+		return r.doctor(ctx)
 	case "capabilities":
 		if len(args) != 1 {
 			return errors.New("Usage: starcat capabilities")
@@ -237,12 +240,12 @@ func (r *Runner) runRepo(ctx context.Context, args []string) error {
 }
 
 func (r *Runner) runRepoNote(ctx context.Context, args []string) error {
-	positionals, flags, err := parseFlags(args, map[string]bool{"stdin": false, "apply": false})
+	positionals, flags, err := parseFlags(args, map[string]bool{"apply": false})
 	if err != nil {
 		return err
 	}
-	if len(positionals) != 2 || positionals[0] != "set" || !hasFlag(flags, "stdin") {
-		return errors.New("Usage: starcat repo note set <owner/name> --stdin [--apply]")
+	if len(positionals) != 2 || positionals[0] != "set" {
+		return errors.New("Usage: starcat repo note set <owner/name> [--apply]")
 	}
 	selector, err := repoSelector(positionals[1])
 	if err != nil {
@@ -344,17 +347,7 @@ func (r *Runner) runTag(ctx context.Context, args []string) error {
 	return r.callWrite(ctx, "starcat.create_tag", "local_writes", arguments)
 }
 
-func (r *Runner) runDoctor(ctx context.Context, args []string) error {
-	jsonOutput := false
-	if len(args) == 1 && args[0] == "--json" {
-		jsonOutput = true
-	} else if len(args) != 0 {
-		return errors.New("Usage: starcat doctor [--json]")
-	}
-	return r.doctor(ctx, jsonOutput)
-}
-
-func (r *Runner) doctor(ctx context.Context, jsonOutput bool) error {
+func (r *Runner) doctor(ctx context.Context) error {
 	profile, err := r.Profiles.Load()
 	if err != nil {
 		return err
@@ -367,23 +360,9 @@ func (r *Runner) doctor(ctx context.Context, jsonOutput bool) error {
 	if err != nil {
 		return err
 	}
-	capabilities, err := client.CallTool(ctx, "starcat.get_capabilities", map[string]any{})
-	if err != nil {
+	if _, err := client.CallTool(ctx, "starcat.get_capabilities", map[string]any{}); err != nil {
 		return err
 	}
-	result := map[string]any{
-		"healthy":          true,
-		"cli_version":      mcp.Version,
-		"app_version":      profile.AppVersion,
-		"protocol_version": profile.ProtocolVersion,
-		"endpoint":         profile.Endpoint,
-		"tool_count":       len(tools),
-		"capabilities":     capabilities,
-	}
-	if jsonOutput {
-		return r.writeJSON(result)
-	}
-
 	tlsStatus := "✓ Local loopback connection"
 	if strings.HasPrefix(profile.Endpoint, "https://") {
 		tlsStatus = "✓ TLS certificate fingerprint verified"
@@ -658,7 +637,7 @@ Usage:
 Pairing and diagnostics:
   pair [one-time-pairing-URI]  Pair with Starcat; without an argument, paste the URI and press Enter
   unpair                        Remove the paired device credential
-  doctor [--json]              Check pairing, connection, tools, and capabilities
+  doctor                       Check pairing, connection, tools, and capabilities
   update                        Update a standalone Starcat CLI installation
 
 Information:
@@ -679,7 +658,7 @@ Read commands:
   tags list
 
 Write commands (dry-run by default; --apply persists changes):
-  repo note set <owner/name> --stdin [--apply]
+  repo note set <owner/name> [--apply]
   repo status set <owner/name> <unread|read|using> [--apply]
   repo tags <add|remove|replace> <owner/name> <tag...> [--apply]
   tag create <name> [--color HEX] [--icon SYMBOL] [--apply]
@@ -698,10 +677,7 @@ inside the Starcat app.`,
 	"doctor": `Check the Starcat CLI connection
 
 Usage:
-  starcat doctor [--json]
-
-The default output is formatted for a terminal. Use --json only when a script
-or agent needs a machine-readable result.`,
+  starcat doctor`,
 	"capabilities": `Print Starcat capabilities
 
 Usage:
@@ -724,9 +700,11 @@ Usage:
   starcat repo context <owner/name>
   starcat repo readme <owner/name>
   starcat repo summary <owner/name> [--generate] [--allow-external-context]
-  starcat repo note set <owner/name> --stdin [--apply]
+  starcat repo note set <owner/name> [--apply]
   starcat repo status set <owner/name> <unread|read|using> [--apply]
-  starcat repo tags <add|remove|replace> <owner/name> <tag...> [--apply]`,
+  starcat repo tags <add|remove|replace> <owner/name> <tag...> [--apply]
+
+Note content is always read from stdin.`,
 	"tags": `List Starcat tags
 
 Usage:

@@ -22,7 +22,7 @@ func TestRepoNoteRejectsDisabledWritesBeforeReadingStdin(t *testing.T) {
 	runner, calls, closeServer := newWriteRunner(t, stdin, false)
 	defer closeServer()
 
-	err := runner.Run(context.Background(), []string{"repo", "note", "set", "toptal/gitignore.io", "--stdin"})
+	err := runner.Run(context.Background(), []string{"repo", "note", "set", "toptal/gitignore.io"})
 	if err == nil || !strings.Contains(err.Error(), "enable Allow Local Writes") {
 		t.Fatalf("Run() error = %v, want local-write guidance", err)
 	}
@@ -47,11 +47,8 @@ func TestRepoTagReplaceExplainsDestructiveWriteSetting(t *testing.T) {
 	}
 }
 
-func TestPairRejectsRemovedStdinFlag(t *testing.T) {
+func TestPairRejectsInvalidURI(t *testing.T) {
 	runner := &Runner{Stdin: strings.NewReader("invalid\n"), Stdout: io.Discard, Stderr: io.Discard}
-	if err := runner.Run(context.Background(), []string{"pair", "--stdin"}); err == nil || !strings.Contains(err.Error(), "unknown flag") {
-		t.Fatalf("pair --stdin error = %v, want unknown flag", err)
-	}
 	if err := runner.Run(context.Background(), []string{"pair", "starcat-pair://invalid"}); err == nil || !strings.Contains(err.Error(), "invalid pairing URI") {
 		t.Fatalf("pair URI error = %v", err)
 	}
@@ -98,7 +95,7 @@ func TestUpdateWritesTerminalResult(t *testing.T) {
 	}
 }
 
-func TestDoctorDefaultsToTerminalTextAndJSONIsExplicit(t *testing.T) {
+func TestDoctorUsesTerminalText(t *testing.T) {
 	var stdout bytes.Buffer
 	runner, _, closeServer := newWriteRunner(t, strings.NewReader(""), true)
 	defer closeServer()
@@ -111,17 +108,6 @@ func TestDoctorDefaultsToTerminalTextAndJSONIsExplicit(t *testing.T) {
 		t.Fatalf("doctor stdout = %q, want terminal text", stdout.String())
 	}
 
-	stdout.Reset()
-	if err := runner.Run(context.Background(), []string{"doctor", "--json"}); err != nil {
-		t.Fatalf("Run(doctor --json) error = %v", err)
-	}
-	if !strings.Contains(stdout.String(), `"healthy": true`) {
-		t.Fatalf("doctor --json stdout = %q", stdout.String())
-	}
-
-	if err := runner.Run(context.Background(), []string{"doctor", "--verbose"}); err == nil {
-		t.Fatal("doctor accepted an unknown flag")
-	}
 }
 
 func TestUnknownFlagsAreRejected(t *testing.T) {
@@ -165,13 +151,6 @@ func TestStatisticsCommandsRenderTerminalFriendlyOutput(t *testing.T) {
 	}
 }
 
-func TestStatisticsCommandsRejectJSONFlag(t *testing.T) {
-	runner := &Runner{Stdout: io.Discard}
-	if err := runner.Run(context.Background(), []string{"stats", "--json"}); err == nil || !strings.Contains(err.Error(), "unknown stats subcommand") {
-		t.Fatalf("stats --json error = %v, want removed-flag rejection", err)
-	}
-}
-
 func TestRepoNotePipeInputDoesNotPrintInteractivePrompt(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -180,7 +159,7 @@ func TestRepoNotePipeInputDoesNotPrintInteractivePrompt(t *testing.T) {
 	runner.Stdout = &stdout
 	runner.Stderr = &stderr
 
-	if err := runner.Run(context.Background(), []string{"repo", "note", "set", "toptal/gitignore.io", "--stdin", "--apply"}); err != nil {
+	if err := runner.Run(context.Background(), []string{"repo", "note", "set", "toptal/gitignore.io", "--apply"}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 	if stderr.Len() != 0 {
@@ -201,7 +180,7 @@ func TestRepoNoteInteractiveInputPrintsEOFAndCancelGuidance(t *testing.T) {
 	runner.Stderr = &stderr
 	runner.stdinInteractive = true
 
-	if err := runner.Run(context.Background(), []string{"repo", "note", "set", "toptal/gitignore.io", "--stdin"}); err != nil {
+	if err := runner.Run(context.Background(), []string{"repo", "note", "set", "toptal/gitignore.io"}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 	if !strings.Contains(stderr.String(), "Ctrl+D") || !strings.Contains(stderr.String(), "Ctrl+C") {
@@ -216,7 +195,7 @@ func TestRepoNoteStdinReadStopsWhenContextIsCanceled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	result := make(chan error, 1)
 	go func() {
-		result <- runner.Run(ctx, []string{"repo", "note", "set", "toptal/gitignore.io", "--stdin"})
+		result <- runner.Run(ctx, []string{"repo", "note", "set", "toptal/gitignore.io"})
 	}()
 
 	select {

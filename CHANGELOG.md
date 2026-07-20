@@ -4,6 +4,11 @@ All notable changes to Starcat CLI are documented here.
 
 The project follows Semantic Versioning. GitHub Releases are the source of published binaries and release notes.
 
+## Unreleased
+
+- Removed the redundant machine-readable doctor output; automation uses structured MCP tools instead.
+- Removed the redundant note-input marker; `repo note set` now always reads content from stdin.
+
 ## v1.0.0 - 2026-07-20
 
 - Added verified cross-platform self-update support.
@@ -14,6 +19,5 @@ The project follows Semantic Versioning. GitHub Releases are the source of publi
 - Added terminal-friendly repository, AI usage, knowledge-base, and RAG chunk statistics backed by structured MCP tools.
 - Changed pairing so users can paste a complete pairing command or press Enter after entering a one-time URI.
 - Changed human-facing commands to terminal-friendly text while keeping data commands machine-readable JSON.
-- Kept `doctor --json` only for callers that explicitly need structured diagnostics.
 - Rejected unknown CLI flags instead of silently accepting them.
 - Standardized all command-line output in English.

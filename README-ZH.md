@@ -88,9 +88,9 @@ starcat repo summary owner/repo
 starcat tags list
 ```
 
-`starcat stats`、`starcat stats ai`、`starcat stats knowledge` 使用适合终端阅读的输出，并且故意不提供 `--json`。Agent 通过 `starcat mcp` 调用同一组统计工具，直接获得结构化结果。统计全部来自本地只读数据：概览覆盖 Star、知识库、AI Token 和 RAG 分片；AI 用量支持时间、功能、Provider、Model 筛选；知识库统计包含来源覆盖与索引健康度。
+`starcat stats`、`starcat stats ai`、`starcat stats knowledge` 使用适合终端阅读的输出，不提供额外的 JSON 输出参数。Agent 通过 `starcat mcp` 调用同一组统计工具，直接获得结构化结果。统计全部来自本地只读数据：概览覆盖 Star、知识库、AI Token 和 RAG 分片；AI 用量支持时间、功能、Provider、Model 筛选；知识库统计包含来源覆盖与索引健康度。
 
-`help`、`version`、`pair`、`unpair`、`doctor` 和 `update` 默认使用适合终端阅读的文本；`capabilities`、`repo`、`tags` 等数据命令直接输出 JSON。只有自动化确实需要机器可读诊断时才使用 `starcat doctor --json`。
+`help`、`version`、`pair`、`unpair`、`doctor`、`update` 和全部 `stats` 命令只输出适合终端阅读的文本，不提供 JSON 输出参数；Agent 通过 `starcat mcp` 获取结构化结果。`capabilities`、`repo`、`tags` 等数据命令则直接输出 JSON。
 
 写操作默认 dry-run，必须显式传 `--apply` 才会持久化。
 
