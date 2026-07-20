@@ -33,8 +33,8 @@ mkdir -p "$(dirname "${output}")"
   echo 'class Starcat < Formula'
   echo '  desc "Cross-platform CLI and MCP bridge for Starcat"'
   echo '  homepage "https://github.com/starcat-app/starcat-cli"'
-  echo '  license "MIT"'
   echo "  version \"${formula_version}\""
+  echo '  license "MIT"'
   echo
   echo '  on_macos do'
   echo '    if Hardware::CPU.arm?'
